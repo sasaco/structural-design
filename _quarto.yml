@@ -1,0 +1,35 @@
+project:
+  type: default
+  output-dir: output
+  render:
+    - sample-beam.qmd
+
+lang: ja
+jupyter: python3
+execute:
+  echo: false
+  error: false
+  cache: false
+  freeze: false
+  daemon: false
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    toc-title: 目次
+    number-sections: true
+    embed-resources: true
+    html-math-method: mathml
+  typst:
+    papersize: a4
+    mainfont: Meiryo
+    fontsize: 10pt
+    margin:
+      x: 20mm
+      y: 18mm
+    toc: false
+    section-numbering: "1.1"
+    page-numbering: "1 / 1"
+    fig-format: svg
