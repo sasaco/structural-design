@@ -22,38 +22,31 @@ def self_test(args, app_class):
         app = app_class(root)
         root.update_idletasks()
         assert len(app.operations) == 4
-        app.mode.set("NDT")
-        app.mode_changed()
-        assert not app.operations["horizontal"].get() and not app.operations["pressure"].get()
-        assert str(app.operation_buttons["horizontal"]["state"]) == "disabled"
-        app.mode.set("NDU")
-        app.mode_changed()
+        assert set(app.paths) == {"sdc", "ndu", "output"}
+        assert all(str(button["state"]) == "normal" for button in app.operation_buttons.values())
         assert all(variable.get() for variable in app.operations.values())
-        report["checks"].append("tkinter-ui-and-mode-switch")
-        if args.sdc or args.ndu or args.ndt:
+        report["checks"].append("tkinter-ui")
+        if args.sdc or args.ndu:
             if not (args.sdc and args.ndu):
                 raise ValueError("変換検証には --sdc と --ndu の両方が必要です。")
-            originals = {p: p.read_bytes() for p in (args.sdc, args.ndu, args.ndt) if p}
+            originals = {p: p.read_bytes() for p in (args.sdc, args.ndu) if p}
             with tempfile.TemporaryDirectory(prefix="SDCConverter-日本語 ") as folder:
                 destination = Path(folder)
-                for ndt in (None, args.ndt) if args.ndt else (None,):
-                    request = converter.Request(args.sdc, args.ndu, ndt,
-                                                ("shaft", "tip") if ndt else tuple(converter.OPERATIONS),
-                                                shaft_profile="existing-screen")
-                    plan = converter.prepare(request)
-                    output = destination / ("変換 結果.ndt" if ndt else "変換 結果.ndu")
-                    saved = converter.save(plan, output)
-                    assert output.read_bytes() == plan.data
-                    audit = json.loads(saved.report.read_text(encoding="utf-8"))
-                    assert audit["output_sha256"] == converter.digest(output.read_bytes())
-                    rerun = converter.Request(args.sdc, args.ndu if ndt else output, output if ndt else None,
-                                              request.operations, shaft_profile="existing-screen")
-                    repeated = converter.prepare(rerun)
-                    assert repeated.data == plan.data
-                    replaced = converter.save(repeated, output, overwrite=True)
-                    assert replaced.backup.read_bytes() == plan.data
-                    report["checks"].append({"format": output.suffix, "rows": len(plan.rows),
-                                             "sha256": converter.digest(plan.data), "backup": True})
+                request = converter.Request(args.sdc, args.ndu, shaft_profile="existing-screen")
+                plan = converter.prepare(request)
+                output = destination / "変換 結果.ndu"
+                saved = converter.save(plan, output)
+                assert output.read_bytes() == plan.data
+                audit = json.loads(saved.report.read_text(encoding="utf-8"))
+                assert audit["output_sha256"] == converter.digest(output.read_bytes())
+                rerun = converter.Request(args.sdc, output, operations=request.operations,
+                                          shaft_profile="existing-screen")
+                repeated = converter.prepare(rerun)
+                assert repeated.data == plan.data
+                replaced = converter.save(repeated, output, overwrite=True)
+                assert replaced.backup.read_bytes() == plan.data
+                report["checks"].append({"format": output.suffix, "rows": len(plan.rows),
+                                         "sha256": converter.digest(plan.data), "backup": True})
                 # GUIの実ボタンと同じ実行経路（ワーカー→イベントキュー→Tk表示）も通す。
                 app.auto_open.set(False)
                 app.paths["sdc"].set(str(args.sdc))

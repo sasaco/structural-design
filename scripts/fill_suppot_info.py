@@ -1,4 +1,4 @@
-"""右SDCの杭周面ばね・支持力をNDUのSuppotInfo／NDTのSUPPORTへ入力する。
+"""右SDCの杭周面ばね・支持力をNDUのSuppotInfoへ入力する。
 
 既存画面方式: 押込み側K1を正負の全勾配、Fyを正負の両制限値へ設定する。
 原本は保持。--output省略は確認表示。出力時は--profile existing-screenを明示する。
@@ -336,100 +336,6 @@ def sync_ndu_support_cases(raw: bytes) -> bytes:
     return b"".join(result)
 
 
-def card(lines: list[bytes], name: bytes) -> tuple[int, int]:
-    hits = [i for i, l in enumerate(lines) if l.strip() == name]
-    if len(hits) != 1:
-        raise InputError(f"NDTの{name.decode()}カードが1個必要です")
-    start = hits[0]
-    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip() == b"END"), None)
-    if end is None:
-        raise InputError(f"NDTの{name.decode()}カードが閉じていません")
-    return start, end
-
-
-def validate_ndt_geometry(raw: bytes, ndu: base.Ndu, groups: dict[int, int]):
-    lines = raw.splitlines(keepends=True)
-    a, b = card(lines, b"JOINT")
-    joints = {}
-    for line in lines[a + 1:b]:
-        if not line.strip():
-            continue
-        node = base.integer(line[:10].decode("ascii"), "NDT節点")
-        if node in joints:
-            raise InputError("NDT節点番号が重複しています")
-        joints[node] = [base.number(line[j:j + 10].decode("ascii"), "NDT座標") for j in (10, 20)]
-    a, b = card(lines, b"MEMBER")
-    if lines[a + 1].strip() != b"CASE-1" or any(l.strip().startswith(b"CASE-") for l in lines[a + 2:b]):
-        raise InputError("NDTの部材は単一CASE-1のみ対応しています")
-    elements = {}
-    for line in lines[a + 2:b]:
-        if not line.strip():
-            continue
-        ident = base.integer(line[:10].decode("ascii"), "NDT部材")
-        if ident in elements:
-            raise InputError("NDT部材番号が重複しています")
-        elements[ident] = [base.integer(line[j:j + 5].decode("ascii"), "NDT部材節点") for j in (10, 15)]
-    for member in base.collect_members(ndu, groups):
-        nodes = [int(v) for v in ndu.fields(f"ElementInfo{member.number}", 6)[4:6]]
-        if elements.get(member.number) != nodes:
-            raise InputError(f"NDTとNDUの部材{member.number}の接続が一致しません")
-        for node in nodes:
-            xy = [base.number(v, "NDU座標") for v in ndu.fields(f"JointXY{node}", 2)[:2]]
-            if joints.get(node) != xy:
-                raise InputError(f"NDTとNDUの節点{node}の座標が一致しません")
-
-
-def fixed(value: str, width: int) -> bytes:
-    token = value.encode("ascii")
-    if len(token) > width:
-        raise InputError(f"NDTの{width}桁に収まらない値です: {value}")
-    return token.rjust(width)
-
-
-def render_ndt(raw: bytes, updates: dict[int, list[str]], zeros: set[int]):
-    lines = raw.splitlines(keepends=True)
-    a, b = card(lines, b"SUPPORT")
-    if lines[a + 1].strip() != b"CASE-1" or any(l.strip().startswith(b"CASE-") for l in lines[a + 2:b]):
-        raise InputError("NDTの支点は単一CASE-1のみ対応しています")
-    d, de = card(lines, b"DIMENSION")
-    if de != d + 2 or len(lines[d + 1].rstrip(b"\r\n")) < 20:
-        raise InputError("NDTのDIMENSION形式が不正です")
-    updated, seen, used, total = {}, set(), set(), 0
-    for i in range(a + 2, b):
-        body = lines[i].rstrip(b"\r\n")
-        if not body.strip():
-            continue
-        if len(body) != 115:
-            raise InputError("NDT SUPPORTは115桁の固定長形式が必要です")
-        node = base.integer(body[:10].decode("ascii"), "NDT支点節点")
-        direction = base.integer(body[10:15].decode("ascii"), "NDT支点拘束方向")
-        total += 1
-        if direction != 2:
-            continue
-        if node in seen:
-            raise InputError(f"NDT節点{node}のY支点が重複しています")
-        seen.add(node)
-        if node in zeros:
-            raise InputError(f"節点{node}: 抵抗を考慮しない区間に既存Y支点があります")
-        if node in updates:
-            updated[i] = body[:15] + b"".join(fixed(v, 10) for v in updates[node]) + eol(lines[i])
-            used.add(node)
-    if count(lines[d + 1][10:15].decode("ascii"), "NDT支点数") != total:
-        raise InputError("DIMENSIONの支点数とSUPPORTの行数が一致しません")
-    added = [n for n in updates if n not in used]
-    newline = eol(lines[a]) or b"\r\n"
-    new_lines = [fixed(str(n), 10) + fixed("2", 5) + b"".join(fixed(v, 10) for v in updates[n]) + newline for n in added]
-    if added:
-        old = lines[d + 1]
-        updated[d + 1] = old[:10] + fixed(str(total + len(added)), 5) + old[15:]
-    result = []
-    for i, line in enumerate(lines):
-        if i == b:
-            result.extend(new_lines)
-        result.append(updated.get(i, line))
-    return b"".join(result), {"updated": len(used), "added": len(added), "support_count": total + len(added)}
-
-
 def same_path(a: Path, b: Path) -> bool:
     return a.resolve() == b.resolve() or (a.exists() and b.exists() and a.samefile(b))
 
@@ -447,24 +353,23 @@ def save_new(path: Path, content: bytes) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
-    parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力NDU（NDTの場合も杭グループ・接続の参照用）")
-    parser.add_argument("--ndt", type=Path, help="指定するとこのNDTのSUPPORTを更新する。NDUと対象杭の幾何を照合")
+    parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力NDU")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:SDC列")
     parser.add_argument("--profile", choices=["existing-screen"], help="既存画面方式を明示選択（出力には必須）")
     parser.add_argument("--k-decimals", type=int, choices=range(7), default=0)
     parser.add_argument("--force-decimals", type=int, choices=range(7), default=1)
-    parser.add_argument("--output", type=Path, help="別名NDU/NDT。省略時は確認表示")
+    parser.add_argument("--output", type=Path, help="別名NDU。省略時は確認表示")
     parser.add_argument("--report", type=Path, help="計算根拠と出力フィールドのJSON（確認表示時にも出力可）")
     args = parser.parse_args(argv)
     try:
         if args.output and not args.profile:
             raise InputError("出力時は --profile existing-screen を指定してください（押込みK1/Fyを正負の全勾配/制限値へ設定、先端保持）")
-        expected_suffix = ".ndt" if args.ndt else ".ndu"
+        expected_suffix = ".ndu"
         if args.output and args.output.suffix.lower() != expected_suffix:
             raise InputError(f"出力拡張子は{expected_suffix}にしてください")
         if args.report and args.report.suffix.lower() != ".json":
             raise InputError("報告書は.jsonで指定してください")
-        inputs = [args.sdc, args.ndu] + ([args.ndt] if args.ndt else [])
+        inputs = [args.sdc, args.ndu]
         outputs = [p for p in (args.output, args.report) if p]
         if any(same_path(o, i) for o in outputs for i in inputs) or (len(outputs) == 2 and same_path(*outputs)):
             raise InputError("入力・出力・報告書は別のパスを指定してください")
@@ -472,11 +377,7 @@ def main(argv: list[str] | None = None) -> int:
         ndu = base.parse_ndu(snapshots[args.ndu])
         profile, groups = parse_sdc(snapshots[args.sdc]), base.parse_groups(args.groups)
         updates, zeros, tips, rows = make_plan(ndu, profile, groups, args.k_decimals, args.force_decimals)
-        if args.ndt:
-            validate_ndt_geometry(snapshots[args.ndt], ndu, groups)
-            result, summary = render_ndt(snapshots[args.ndt], updates, zeros)
-        else:
-            result, summary = render_ndu(snapshots[args.ndu], updates, zeros)
+        result, summary = render_ndu(snapshots[args.ndu], updates, zeros)
         report = {"configuration": {"profile": "existing-screen", "profile_explicit": bool(args.profile), "groups": groups,
                   "source_side": "compression", "all_stiffness_fields": "K1", "all_limit_fields": "Fy",
                   "capacity_divisor": "1", "tip": "preserve-not-generated", "k_decimals": args.k_decimals,

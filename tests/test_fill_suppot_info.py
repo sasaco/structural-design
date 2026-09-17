@@ -58,23 +58,6 @@ def ndu_bytes(existing=False, empty=False):
             + cases + "Untouched= 末尾の空白 ").encode("cp932")
 
 
-def ndt_row(node, direction=2, values=None):
-    values = values or ["91", "92", "93", "94", "95", "96", "97", "98", "99", "100"]
-    return f"{node:10}{direction:5}".encode() + b"".join(v.encode().rjust(10) for v in values) + b"\r\n"
-
-
-def ndt_bytes(existing=False, empty=False):
-    joints = b"".join(f"{node:10}{3:10.3f}{y:10.3f}\r\n".encode() for node, y in [(501, 10), (203, 11), (702, 12), (405, 13)])
-    members = b"".join(f"{e:10}{a:5}{b:5}    0\r\n".encode() for e, a, b in [(98, 501, 203), (99, 203, 702), (100, 702, 405)])
-    rows = b"" if empty else ndt_row(203, 1) + ndt_row(405)
-    if existing:
-        rows += ndt_row(203)
-    total = 0 if empty else 3 if existing else 2
-    return (b"START   52\r\nDIMENSION\r\n" + f"{4:5}{3:5}{total:5}{2:5}\r\n".encode()
-            + b"END\r\nJOINT\r\n" + joints + b"END\r\nMEMBER\r\nCASE-1\r\n" + members
-            + b"END\r\nSUPPORT\r\nCASE-1\r\n" + rows + b"END\r\nUNTouched tail  ")
-
-
 def plan(raw=None, sdc=None, **kwargs):
     return app.make_plan(base.parse_ndu(raw or ndu_bytes()), app.parse_sdc(sdc or sdc_bytes()), {4: 1}, **kwargs)
 
@@ -273,51 +256,13 @@ class SupportCaseTests(unittest.TestCase):
             f"Suppot_ChokuKisoCaseNo{n}=0\r\n".encode() for n in range(1, 4)))
 
 
-class NdtWriterTests(unittest.TestCase):
-    def setUp(self):
-        self.updates, self.zeros, _, _ = plan()
-
-    def test_geometry_matches_and_mismatches(self):
-        app.validate_ndt_geometry(ndt_bytes(), base.parse_ndu(ndu_bytes()), {4: 1})
-        for raw in [ndt_bytes().replace(b"    11.000", b"    11.100"),
-                    ndt_bytes().replace(b"        98  501  203", b"        98  501  702")]:
-            with self.assertRaises(app.InputError):
-                app.validate_ndt_geometry(raw, base.parse_ndu(ndu_bytes()), {4: 1})
-
-    def test_ndt_update_and_add_preserves_unrelated_bytes_and_dimension(self):
-        raw = ndt_bytes(existing=True)
-        result, summary = app.render_ndt(raw, self.updates, self.zeros)
-        expected = raw.replace(b"    4    3    3    2", b"    4    3    4    2")
-        expected = expected.replace(ndt_row(203), ndt_row(203, values=self.updates[203]) + ndt_row(702, values=self.updates[702]))
-        self.assertEqual(result, expected)
-        self.assertEqual(summary["added"], 1)
-        self.assertEqual(app.render_ndt(result, self.updates, self.zeros)[0], result)
-
-    def test_empty_support_card(self):
-        result, summary = app.render_ndt(ndt_bytes(empty=True), self.updates, self.zeros)
-        self.assertEqual(summary["support_count"], 2)
-        self.assertIn(ndt_row(203, values=self.updates[203]), result)
-
-    def test_multicase_count_mismatch_duplicate_and_overflow_rejected(self):
-        variants = [ndt_bytes().replace(b"SUPPORT\r\nCASE-1", b"SUPPORT\r\nCASE-2"),
-                    ndt_bytes().replace(b"    4    3    2    2", b"    4    3    5    2"),
-                    ndt_bytes().replace(ndt_row(405), ndt_row(501)),
-                    ndt_bytes(existing=True).replace(ndt_row(405), ndt_row(203)),
-                    ndt_bytes().replace(ndt_row(405), ndt_row(405).replace(b"     91", b"    91", 1))]
-        for raw in variants:
-            with self.subTest(raw=raw[-200:]), self.assertRaises(app.InputError):
-                app.render_ndt(raw, self.updates, self.zeros)
-        with self.assertRaises(app.InputError):
-            app.render_ndt(ndt_bytes(), {203: ["12345678901"] * 10}, set())
-
-
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.sdc, self.ndu, self.ndt = [self.root / s for s in ("input.sdc", "input.ndu", "input.ndt")]
-        for p, raw in [(self.sdc, sdc_bytes()), (self.ndu, ndu_bytes()), (self.ndt, ndt_bytes())]:
+        self.sdc, self.ndu = [self.root / s for s in ("input.sdc", "input.ndu")]
+        for p, raw in [(self.sdc, sdc_bytes()), (self.ndu, ndu_bytes())]:
             p.write_bytes(raw)
         self.output, self.report = self.root / "out.ndu", self.root / "out.json"
         self.args = ["--sdc", str(self.sdc), "--ndu", str(self.ndu), "--groups", "4:1"]
@@ -339,14 +284,6 @@ class CliTests(unittest.TestCase):
         self.assertEqual(report["nodes"][0]["field4_to_13"][1], "2")
         self.assertEqual(self.ndu.read_bytes(), ndu_bytes())
         self.assertEqual(self.sdc.read_bytes(), sdc_bytes())
-
-    def test_ndt_output_and_suffix(self):
-        args = ["--profile", "existing-screen", "--ndt", str(self.ndt), "--output", str(self.output)]
-        self.assertEqual(self.invoke(args), 1)
-        args[-1] = str(self.output.with_suffix(".ndt"))
-        self.assertEqual(self.invoke(args), 0)
-        self.assertEqual(self.ndt.read_bytes(), ndt_bytes())
-        self.assertEqual(self.ndu.read_bytes(), ndu_bytes())
 
     def test_collision_conflict_and_preflight_no_partial_output(self):
         for extra in [["--output", str(self.ndu)], ["--report", str(self.sdc)],
@@ -440,11 +377,6 @@ class RealFixtureTests(unittest.TestCase):
                 self.assertEqual(old.split(b",")[:3], new.split(b",")[:3])
                 node = int(old.split(b",")[1])
                 self.assertIn(node, updates)
-        ndt = next(p for p in (app.ROOT / "snap").glob("*.ndt") if "Case1" in p.name)
-        app.validate_ndt_geometry(ndt.read_bytes(), base.parse_ndu(model_raw), {4: 1, 5: 2, 6: 3})
-        result_ndt, summary = app.render_ndt(ndt.read_bytes(), updates, zeros)
-        self.assertEqual(summary, {"updated": 60, "added": 0, "support_count": 126})
-        self.assertEqual(sum(x != y for x, y in zip(ndt.read_bytes().splitlines(), result_ndt.splitlines())), 60)
 
 
 if __name__ == "__main__":

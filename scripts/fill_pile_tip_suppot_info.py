@@ -1,4 +1,4 @@
-"""右SDCの杭先端ばね・支持力をNDUのSuppotInfo／NDTのSUPPORTへ入力する。
+"""右SDCの杭先端ばね・支持力をNDUのSuppotInfoへ入力する。
 
 指定snapモデルの配置: K1±=短期第1勾配、K2±=K3±=短期第2勾配、
 F1+=降伏、F2+=終局、負側制限値は空欄。長さ換算・周面抵抗の合成なし。
@@ -31,7 +31,7 @@ class TipValues:
 
     def fields(self) -> list[str]:
         k1, k2, fy, fu = map(base.format_number, (self.k1, self.k2, self.fy, self.fu))
-        # NDUでは空欄1文字、NDTでは固定幅10文字。ゼロで代用しない。
+        # NDUの空欄は空白1文字。ゼロで代用しない。
         return [k1, fy, " ", k2, fu, " ", k2, k1, k2, k2]
 
 
@@ -169,19 +169,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
     parser.add_argument("--ndu", type=Path, default=base.DEFAULT_NDU,
-                        help="入力NDU。NDT更新時も同じモデルの杭グループ参照用に必要")
-    parser.add_argument("--ndt", type=Path, help="指定時はこのNDTのSUPPORTを更新")
+                        help="入力NDU")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:SDC列")
-    parser.add_argument("--output", type=Path, help="別名NDU/NDT。省略時は確認表示")
+    parser.add_argument("--output", type=Path, help="別名NDU。省略時は確認表示")
     parser.add_argument("--report", type=Path, help="参照値・配置・NDU比較結果を保存するJSON")
     args = parser.parse_args(argv)
     try:
-        suffix = ".ndt" if args.ndt else ".ndu"
+        suffix = ".ndu"
         if args.output and args.output.suffix.lower() != suffix:
             raise InputError(f"出力拡張子は{suffix}にしてください")
         if args.report and args.report.suffix.lower() != ".json":
             raise InputError("報告書は.jsonで指定してください")
-        inputs = [args.sdc, args.ndu] + ([args.ndt] if args.ndt else [])
+        inputs = [args.sdc, args.ndu]
         outputs = [p for p in (args.output, args.report) if p]
         if any(support.same_path(o, i) for o in outputs for i in inputs) or (
                 len(outputs) == 2 and support.same_path(*outputs)):
@@ -190,11 +189,7 @@ def main(argv: list[str] | None = None) -> int:
         ndu = base.parse_ndu(snapshots[args.ndu])
         profile, groups = parse_sdc(snapshots[args.sdc]), base.parse_groups(args.groups)
         updates, rows = make_plan(ndu, profile, groups)
-        if args.ndt:
-            support.validate_ndt_geometry(snapshots[args.ndt], ndu, groups)
-            result, summary = support.render_ndt(snapshots[args.ndt], updates, set())
-        else:
-            result, summary = support.render_ndu(snapshots[args.ndu], updates, set())
+        result, summary = support.render_ndu(snapshots[args.ndu], updates, set())
         report = {"configuration": {"profile": "existing-tip", "groups": groups,
                   "direction": "直角方向", "k3": "K2", "negative_limits": "blank",
                   "rounding": "none", "length_or_pile_count_factor": "none", "shaft_resistance": "not-added",

@@ -74,7 +74,7 @@ def main():
                 archive.write(path, path.relative_to(bundle.parent))
     with zipfile.ZipFile(archive_path) as archive:
         assert archive.testzip() is None
-        if any(Path(name).suffix.lower() in (".sdc", ".ndu", ".ndt", ".xlsx") for name in archive.namelist()):
+        if any(Path(name).suffix.lower() in (".sdc", ".ndu", ".xlsx") for name in archive.namelist()):
             raise RuntimeError("Project input data must not be bundled")
         extracted = session / "配布 検証"
         archive.extractall(extracted)
@@ -85,8 +85,7 @@ def main():
     smoke_report = session / "packaged-smoke.json"
     run([extracted / APP_NAME / f"{APP_NAME}.exe", "--self-test", smoke_report,
          "--sdc", ROOT / "snap/今町橋りょう4P(右).sdc",
-         "--ndu", ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu",
-         "--ndt", ROOT / "snap/今町橋りょう4P(C方向･右押し→)(Case1_ρm10_αf1_正向).ndt"],
+         "--ndu", ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"],
         cwd=extracted, env=environment, timeout=90)
     result = json.loads(smoke_report.read_text(encoding="utf-8"))
     if not result.get("ok") or not result.get("frozen"):

@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import fill_pile_tip_suppot_info as app
 import fill_jiban_shogen as base
 import fill_suppot_info as support
-from test_fill_suppot_info import ndu_bytes, ndt_bytes
+from test_fill_suppot_info import ndu_bytes
 
 
 def sdc_bytes():
@@ -39,7 +39,6 @@ def plan(raw=None, sdc=None, groups=None):
                          app.parse_sdc(sdc if sdc is not None else sdc_bytes()), groups or {4: 1})
 
 
-class SourceAndTipTests(unittest.TestCase):
     def test_selects_short_term_in_transverse_direction_without_rounding(self):
         profile = app.parse_sdc(sdc_bytes())
         self.assertEqual(profile.length, D(3))
@@ -119,23 +118,6 @@ class RenderTests(unittest.TestCase):
                                     b"G_intCHOKU_KISO_Link_Num=0\r\nSuppot_ChokuKisoCaseNo1=0\r\n")
         self.assertEqual(result, expected.replace(b"ShitenCaseNum=0\r\n", b"ShitenCaseNum=0\r\n" + added))
 
-    def test_ndt_fixed_width_blanks_update_and_append(self):
-        updates, _ = plan()
-        for empty in (False, True):
-            with self.subTest(empty=empty):
-                raw = ndt_bytes(empty=empty)
-                result, summary = support.render_ndt(raw, updates, set())
-                support.validate_ndt_geometry(result, base.parse_ndu(ndu_bytes()), {4: 1})
-                a, b = support.card(result.splitlines(), b"SUPPORT")
-                line = next(l for l in result.splitlines()[a + 2:b] if int(l[:10]) == 405)
-                self.assertEqual(len(line), 115)
-                self.assertEqual(line[35:45], b" " * 10)
-                self.assertEqual(line[65:75], b" " * 10)
-                self.assertEqual([line[i:i + 10].decode().strip() for i in range(15, 115, 10)],
-                                 [s.strip() for s in updates[405]])
-                self.assertEqual(summary["added"], int(empty))
-                self.assertEqual(support.render_ndt(result, updates, set())[0], result)
-
     def test_zero_and_blank_are_not_equal(self):
         updates, _ = plan()
         raw, _ = support.render_ndu(ndu_bytes(), updates, set())
@@ -159,8 +141,8 @@ class CliTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.sdc, self.ndu, self.ndt = [self.root / ("input" + ext) for ext in (".sdc", ".ndu", ".ndt")]
-        for path, data in [(self.sdc, sdc_bytes()), (self.ndu, ndu_bytes()), (self.ndt, ndt_bytes())]:
+        self.sdc, self.ndu = [self.root / ("input" + ext) for ext in (".sdc", ".ndu")]
+        for path, data in [(self.sdc, sdc_bytes()), (self.ndu, ndu_bytes())]:
             path.write_bytes(data)
         self.args = ["--sdc", str(self.sdc), "--ndu", str(self.ndu), "--groups", "4:1"]
 
@@ -170,7 +152,7 @@ class CliTests(unittest.TestCase):
 
     def test_dry_run_and_separate_ndu_report_are_repeatable(self):
         self.assertEqual(self.run_cli(), 0)
-        self.assertEqual(len(list(self.root.iterdir())), 3)
+        self.assertEqual(len(list(self.root.iterdir())), 2)
         output, report = self.root / "out.ndu", self.root / "report.json"
         args = ["--output", str(output), "--report", str(report)]
         self.assertEqual(self.run_cli(*args), 0)
@@ -178,15 +160,6 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.ndu.read_bytes(), ndu_bytes())
         self.assertEqual(self.sdc.read_bytes(), sdc_bytes())
         self.assertEqual(json.loads(report.read_text(encoding="utf8"))["nodes"][0]["node"], 405)
-
-    def test_ndt_cli_and_geometry_mismatch(self):
-        output = self.root / "out.ndt"
-        self.assertEqual(self.run_cli("--ndt", str(self.ndt), "--output", str(output)), 0)
-        changed = ndt_bytes().replace(b"     3.000    13.000", b"     3.000    13.100")
-        self.assertNotEqual(changed, ndt_bytes())
-        self.ndt.write_bytes(changed)
-        self.assertEqual(self.run_cli("--ndt", str(self.ndt), "--output", str(self.root / "bad.ndt")), 1)
-        self.assertFalse((self.root / "bad.ndt").exists())
 
     def test_existing_tip_output_repairs_missing_cases_without_adding_supports(self):
         raw = b"".join(l for l in ndu_bytes().splitlines(keepends=True)
@@ -207,7 +180,7 @@ class CliTests(unittest.TestCase):
         self.assertFalse(output.exists())
         self.assertEqual(report.read_bytes(), b"existing report")
         self.assertEqual(self.run_cli("--output", str(self.ndu)), 1)
-        self.assertEqual(self.run_cli("--output", str(self.root / "out.ndt")), 1)
+        self.assertEqual(self.run_cli("--output", str(self.root / "out.txt")), 1)
         self.assertEqual(self.ndu.read_bytes(), ndu_bytes())
 
     def test_hardlink_output_rejected(self):
@@ -229,11 +202,10 @@ class CliTests(unittest.TestCase):
 
 
 class ActualFileTests(unittest.TestCase):
-    def test_snap_ndu_and_ndt_exact_byte_match_all_three_tips(self):
+    def test_snap_ndu_exact_byte_match_all_three_tips(self):
         root = Path(__file__).resolve().parents[1]
         sdc = (root / "snap/今町橋りょう4P(右).sdc").read_bytes()
         ndu = (root / "snap/今町橋りょう4P(C方向･右押し→).ndu").read_bytes()
-        ndt = (root / "snap/今町橋りょう4P(C方向･右押し→)(Case1_ρm10_αf1_正向).ndt").read_bytes()
         updates, rows = plan(ndu, sdc, {4: 1, 5: 2, 6: 3})
         self.assertEqual([r["node"] for r in rows], [122, 147, 172])
         self.assertEqual(updates[122], ["327072", "7167.5", " ", "88418", "16724.3", " ",
@@ -242,8 +214,6 @@ class ActualFileTests(unittest.TestCase):
                                         "58945", "218048", "58945", "58945"])
         self.assertEqual(updates[172], updates[122])
         self.assertEqual(support.render_ndu(ndu, updates, set())[0], ndu)
-        support.validate_ndt_geometry(ndt, base.parse_ndu(ndu), {4: 1, 5: 2, 6: 3})
-        self.assertEqual(support.render_ndt(ndt, updates, set())[0], ndt)
         self.assertEqual([r["status"] for r in app.compare_ndu(ndu, updates)], ["match"] * 3)
 
 

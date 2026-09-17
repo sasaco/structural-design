@@ -32,7 +32,6 @@ DEFAULT_GROUPS = ("4:1", "5:2", "6:3")
 class Request:
     sdc: Path
     ndu: Path
-    ndt: Path | None = None
     operations: tuple[str, ...] = tuple(OPERATIONS)
     groups: tuple[str, ...] = DEFAULT_GROUPS
     push_direction: str = "right"
@@ -75,14 +74,8 @@ def input_path(path: Path, suffix: str) -> Path:
     return path
 
 
-def support_values(raw: bytes, ndt: bool) -> dict[int, list[str]]:
-    """確認画面用。出力側の現在値を表示し、参照NDUの値と混同しない。"""
-    if ndt:
-        lines = raw.splitlines()
-        a, b = support.card(lines, b"SUPPORT")
-        return {int(line[:10]): [line[i:i + 10].decode("ascii").strip()
-                                 for i in range(15, 115, 10)]
-                for line in lines[a + 2:b] if line.strip() and int(line[10:15]) == 2}
+def support_values(raw: bytes) -> dict[int, list[str]]:
+    """確認画面用にNDUの現在の支点値を取得する。"""
     _, _, entries = support.ndu_supports(raw)
     values = {}
     for _, body in entries.values():
@@ -104,8 +97,6 @@ def prepare(request: Request) -> Plan:
     operations = request.operations
     if not operations or len(set(operations)) != len(operations) or set(operations) - OPERATIONS.keys():
         raise InputError("変換する項目を1つ以上選択してください（重複・不明な項目は不可）。")
-    if request.ndt is not None and set(operations) & {"horizontal", "pressure"}:
-        raise InputError("NDT出力は周面・杭先端のみ対応しています。水平地盤ばね・土圧はNDUを選択してください。")
     if "shaft" in operations and request.shaft_profile != "existing-screen":
         raise InputError("周面ばねは『既存画面方式』を明示してください。")
     if request.push_direction not in ("right", "left"):
@@ -115,17 +106,12 @@ def prepare(request: Request) -> Plan:
         raise InputError("杭グループを KG番号:列番号 の形式で指定してください。")
     sdc_path, ndu_path = input_path(request.sdc, ".sdc"), input_path(request.ndu, ".ndu")
     paths = [sdc_path, ndu_path]
-    if request.ndt is not None:
-        paths.append(input_path(request.ndt, ".ndt"))
     if any(support.same_path(a, b) for i, a in enumerate(paths) for b in paths[i + 1:]):
         raise InputError("入力ファイル同士が同じ実体を参照しています。")
     sources = tuple((p, p.read_bytes()) for p in paths)
     sdc_raw, ndu_raw = sources[0][1], sources[1][1]
     ndu = base.parse_ndu(ndu_raw)
-    is_ndt = request.ndt is not None
-    result = sources[-1][1]
-    if is_ndt:
-        support.validate_ndt_geometry(result, ndu, groups)
+    result = ndu_raw
     rows, details = [], {}
     # 選択順によらず同じ手順で処理する。保存は全項目が成功した後だけ。
     for operation in OPERATIONS:
@@ -166,21 +152,16 @@ def prepare(request: Request) -> Plan:
             else:
                 updates, evidence = tip.make_plan(ndu, tip.parse_sdc(sdc_raw), groups)
                 details[operation] = {"nodes": evidence}
-            render = support.render_ndt if is_ndt else support.render_ndu
-            rendered, summary = render(result, updates, zeros)
-            previous = support_values(result, is_ndt)
+            rendered, summary = support.render_ndu(result, updates, zeros)
+            previous = support_values(result)
             for node, values in updates.items():
                 rows.append(PreviewRow(OPERATIONS[operation], f"節点{node}",
                                        format_support(previous.get(node)), format_support(values)))
             result = rendered
             details[operation]["summary"] = summary
-    # 再描画して同一になることを確認（支点数・ケース行・固定幅も再検査）。
-    if is_ndt:
-        support.validate_ndt_geometry(result, ndu, groups)
-        checked, _ = support.render_ndt(result, {}, set())
-    else:
-        base.parse_ndu(result)
-        checked = support.sync_ndu_support_cases(result) if set(operations) & {"shaft", "tip"} else result
+    # 支点数・ケース行を再検査し、再同期しても同一になることを確認する。
+    base.parse_ndu(result)
+    checked = support.sync_ndu_support_cases(result) if set(operations) & {"shaft", "tip"} else result
     if checked != result:
         raise InputError("変換結果の整合性を確認できませんでした。")
     report = {
@@ -193,7 +174,7 @@ def prepare(request: Request) -> Plan:
         "details": details, "output_sha256": digest(result),
         "preview": [vars(row) for row in rows],
     }
-    return Plan(paths[-1], sources, result, tuple(rows), report)
+    return Plan(ndu_path, sources, result, tuple(rows), report)
 
 
 def verify_sources(plan: Plan) -> None:

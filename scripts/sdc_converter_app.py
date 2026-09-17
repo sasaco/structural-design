@@ -27,8 +27,7 @@ class App:
         self.events = queue.Queue()
         self.busy = False
         self.last_saved = None
-        self.mode = tk.StringVar(value="NDU")
-        self.paths = {key: tk.StringVar() for key in ("sdc", "ndu", "ndt", "output")}
+        self.paths = {key: tk.StringVar() for key in ("sdc", "ndu", "output")}
         self.groups = tk.StringVar(value=" ".join(converter.DEFAULT_GROUPS))
         self.direction = tk.StringVar(value="右押し")
         self.overwrite = tk.BooleanVar(value=False)
@@ -38,8 +37,8 @@ class App:
         self.controls = []
         self.preview_rows = []
         self.build_ui()
-        self.mode_changed()
-        for variable in [self.mode, self.groups, self.direction, self.overwrite,
+        self.output_changed()
+        for variable in [self.groups, self.direction, self.overwrite,
                          *self.paths.values(), *self.operations.values()]:
             variable.trace_add("write", self.invalidate)
         root.after(100, self.poll)
@@ -57,27 +56,17 @@ class App:
         style.configure("Treeview", rowheight=29)
         container = ttk.Frame(self.root, padding=20)
         container.pack(fill="both", expand=True)
-        ttk.Label(container, text="SDC → NDU / NDT", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(container, text="SDC → NDU", style="Title.TLabel").pack(anchor="w")
         ttk.Label(container, text="地盤ばね・土圧・杭支持力の入力", style="Hint.TLabel").pack(anchor="w", pady=(2, 12))
         source = ttk.LabelFrame(container, text="1  入力ファイル", padding=12)
         source.pack(fill="x")
         source.columnconfigure(1, weight=1)
-        options = ttk.Frame(source)
-        options.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
-        ttk.Label(options, text="更新する形式：").pack(side="left")
-        for mode in ("NDU", "NDT"):
-            self.control(ttk.Radiobutton(options, text=mode, variable=self.mode, value=mode,
-                                         command=self.mode_changed)).pack(side="left", padx=8)
-        for row, key, label in ((1, "sdc", "参照SDC"), (2, "ndu", "入力・参照NDU"), (3, "ndt", "更新対象NDT")):
+        for row, key, label in ((0, "sdc", "参照SDC"), (1, "ndu", "入力NDU")):
             ttk.Label(source, text=label, width=16).grid(row=row, column=0, sticky="w", pady=4)
             entry = self.control(ttk.Entry(source, textvariable=self.paths[key]))
             entry.grid(row=row, column=1, sticky="ew", padx=8)
             button = self.control(ttk.Button(source, text="選択…", command=lambda k=key: self.select(k)))
             button.grid(row=row, column=2)
-            if key == "ndt":
-                self.ndt_controls = (entry, button)
-        ttk.Label(source, text="NDTの更新には、杭グループ・座標・部材接続を照合するNDUも必要です。",
-                  style="Hint.TLabel").grid(row=4, column=0, columnspan=3, sticky="w", pady=(6, 0))
         settings = ttk.LabelFrame(container, text="2  入力する項目と杭の対応", padding=12)
         settings.pack(fill="x", pady=10)
         self.operation_buttons = {}
@@ -148,26 +137,17 @@ class App:
             self.preview_rows = []
             self.status.set("設定を変更しました。「入力値を確認」で更新できます。")
 
-    def mode_changed(self):
-        for key in ("horizontal", "pressure"):
-            self.operations[key].set(self.mode.get() == "NDU")
-        self.output_changed()
-
     def apply_states(self):
         for widget in self.controls:
             widget.configure(state="disabled" if self.busy else "normal")
         if self.busy:
             return
         self.direction_box.configure(state="readonly")
-        for widget in self.ndt_controls:
-            widget.configure(state="normal" if self.mode.get() == "NDT" else "disabled")
-        for key in ("horizontal", "pressure"):
-            self.operation_buttons[key].configure(state="normal" if self.mode.get() == "NDU" else "disabled")
         for widget in (self.output_entry, self.output_button):
             widget.configure(state="disabled" if self.overwrite.get() else "normal")
 
     def target(self):
-        return self.paths["ndt" if self.mode.get() == "NDT" else "ndu"].get().strip()
+        return self.paths["ndu"].get().strip()
 
     def output_changed(self):
         target = self.target()
@@ -183,28 +163,27 @@ class App:
                                           filetypes=[(f"{key.upper()}ファイル", f"*.{key}")])
         if path:
             self.paths[key].set(path)
-            if key == ("ndt" if self.mode.get() == "NDT" else "ndu"):
+            if key == "ndu":
                 self.output_changed()
 
     def select_output(self):
-        suffix = "." + self.mode.get().lower()
+        suffix = ".ndu"
         path = filedialog.asksaveasfilename(parent=self.root, title="別名で保存（既存ファイルは上書きしません）",
                                            defaultextension=suffix, confirmoverwrite=False,
                                            initialfile=Path(self.paths["output"].get()).name,
-                                           filetypes=[(self.mode.get() + "ファイル", "*" + suffix)])
+                                           filetypes=[("NDUファイル", "*" + suffix)])
         if path:
             self.paths["output"].set(path)
 
     def request(self):
-        needed = ("sdc", "ndu", "ndt") if self.mode.get() == "NDT" else ("sdc", "ndu")
-        for key in needed:
+        for key in ("sdc", "ndu"):
             if not self.paths[key].get().strip():
                 raise converter.InputError(f"{key.upper()}ファイルを選択してください。")
         return converter.Request(
             Path(self.paths["sdc"].get().strip()), Path(self.paths["ndu"].get().strip()),
-            Path(self.paths["ndt"].get().strip()) if self.mode.get() == "NDT" else None,
-            tuple(key for key, selected in self.operations.items() if selected.get()),
-            tuple(self.groups.get().split()), "right" if self.direction.get() == "右押し" else "left",
+            operations=tuple(key for key, selected in self.operations.items() if selected.get()),
+            groups=tuple(self.groups.get().split()),
+            push_direction="right" if self.direction.get() == "右押し" else "left",
             shaft_profile="existing-screen",
         )
 
@@ -311,7 +290,6 @@ def main():
     parser.add_argument("--self-test", type=Path, help="配布検証レポートの保存先")
     parser.add_argument("--sdc", type=Path)
     parser.add_argument("--ndu", type=Path)
-    parser.add_argument("--ndt", type=Path)
     args = parser.parse_args()
     if args.self_test:
         from portable_smoke import self_test

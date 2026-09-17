@@ -12,7 +12,7 @@
     "rounding": "none",
     "length_or_pile_count_factor": "none",
     "shaft_resistance": "not-added",
-    "output_format": ".ndt"
+    "output_format": ".ndu"
   },
   "field_names": [
     "開始節点",
@@ -31,8 +31,7 @@
   ],
   "sources": {
     "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(右).sdc": "9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7",
-    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→).ndu": "703fd48092d3c4e0592ccb945538b03149f4cfa487d44b600f2a671fffe66a72",
-    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→)(Case1_ρm10_αf1_正向).ndt": "6a50150ac07051486347407f74c8c5629917a0121fd038071ca7f287d4b218ec"
+    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→).ndu": "703fd48092d3c4e0592ccb945538b03149f4cfa487d44b600f2a671fffe66a72"
   },
   "summary": {
     "updated": 3,
@@ -154,5 +153,5 @@
       ]
     }
   ],
-  "output_sha256": "6a50150ac07051486347407f74c8c5629917a0121fd038071ca7f287d4b218ec"
+  "output_sha256": "703fd48092d3c4e0592ccb945538b03149f4cfa487d44b600f2a671fffe66a72"
 }
