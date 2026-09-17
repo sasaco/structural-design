@@ -118,7 +118,8 @@ def self_test(args, app_class):
                         time.sleep(0.01)
                     assert not app.busy, "GUI worker timed out"
                     assert not failures, failures
-                    assert len(app.excel_preview.book.sheets) == 6
+                    assert len(app.excel_preview.book.sheets) == 7
+                    assert "杭周面の支持力" in app.excel_preview.sheet_box["values"]
                     assert app.excel_preview.sheet.name == "変換結果"
                     assert len(app.excel_preview.canvas.find_all()) > 0
                     assert "入力値" not in app.excel_preview.sheet_box["values"]

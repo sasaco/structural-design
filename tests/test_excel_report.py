@@ -34,7 +34,7 @@ class WorkbookTests(unittest.TestCase):
         record=self.plan.report['calculation']
         self.assertEqual(len(record['targets']),207)
         self.assertEqual(len(record['fields']),846)
-        self.assertEqual([s.name for s in self.plan.workbook.sheets],['変換結果','水平地盤ばね','有効抵抗土圧','杭周面ばね','杭先端ばね','入力根拠'])
+        self.assertEqual([s.name for s in self.plan.workbook.sheets],['変換結果','水平地盤ばね','有効抵抗土圧','杭周面ばね','杭周面の支持力','杭先端ばね','入力根拠'])
         details=self.plan.report['details']
         for op,count in [('horizontal',90),('pressure',90),('shaft',72)]:
             self.assertEqual(sum(len(r['pieces']) for r in details[op].get('members',details[op].get('nodes',[]))),count)
@@ -65,19 +65,19 @@ class WorkbookTests(unittest.TestCase):
             normal=styles.find('m:fonts/m:font',ns)
             self.assertEqual(normal.find('m:name',ns).attrib['val'],'Calibri')
             self.assertEqual(normal.find('m:scheme',ns).attrib['val'],'none')
-            for i in range(1,7):
+            for i in range(1,8):
                 root=ET.fromstring(archive.read(f'xl/worksheets/sheet{i}.xml'))
-                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3) else 'landscape')
+                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3,4,5) else 'landscape')
                 self.assertLessEqual(int(root.find('m:pageSetup',ns).attrib.get('scale','100')),100)
-                if i in (2,3):
-                    self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[7,14] if i==2 else [9,18])
+                if i in (2,3,4,5):
+                    self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[9,18] if i==3 else [7,14])
                     self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
                 else:
                     self.assertIsNotNone(root.find('m:rowBreaks',ns))
                     self.assertIsNotNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
                 self.assertFalse(root.findall('.//m:c[@t="e"]',ns))
             workbook=ET.fromstring(archive.read('xl/workbook.xml'))
-            self.assertEqual(len(workbook.findall('.//m:definedName[@name="_xlnm.Print_Area"]',ns)),6)
+            self.assertEqual(len(workbook.findall('.//m:definedName[@name="_xlnm.Print_Area"]',ns)),7)
 
     def test_change_one_source_column_recalculates_only_that_pile_and_keeps_snapshot(self):
         book=report.build(self.plan.report)
@@ -93,7 +93,7 @@ class WorkbookTests(unittest.TestCase):
 
     def test_selected_operations_direction_and_digits(self):
         plan=app.prepare(replace(self.request,operations=('shaft','tip'),groups=('5:2',),shaft_k_decimals=3,shaft_force_decimals=4))
-        self.assertEqual(len(plan.workbook.sheets),4)
+        self.assertEqual(len(plan.workbook.sheets),5)
         self.assertEqual(len(plan.report['calculation']['targets']),21)
         left=app.prepare(replace(self.request,operations=('pressure',),push_direction='left',pressure_cross_layer='endpoints',pressure_decimals=3))
         self.assertTrue(all(r['pressure_column']==r['column'] for r in left.report['details']['pressure']['members']))
@@ -111,7 +111,7 @@ class WorkbookTests(unittest.TestCase):
         gui=App(root)
         gui.excel_preview.show(self.plan.workbook)
         root.update_idletasks()
-        self.assertEqual(len(gui.excel_preview.sheet_box['values']),6)
+        self.assertEqual(len(gui.excel_preview.sheet_box['values']),7)
         for sheet in self.plan.workbook.sheets:
             gui.excel_preview.sheet_name.set(sheet.name)
             gui.excel_preview.select_sheet()

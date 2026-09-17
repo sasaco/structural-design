@@ -139,7 +139,7 @@ class ExcelPreview(ttk.Frame):
         width,height=cv.winfo_width(),cv.winfo_height()
         first=max(0,bisect_right(self.ys,y0)-1)
         last=min(len(self.sheet.rows),bisect_right(self.ys,y0+height)+1)
-        family="ＭＳ 明朝" if self.sheet.layout in ("horizontal","pressure") else "Yu Gothic UI"
+        family="ＭＳ 明朝" if self.sheet.layout in ("horizontal","pressure","shaft") else "Yu Gothic UI"
         normal=(family,max(8,round(10*self.scale)))
         bold=(*normal,"bold")
         frozen=self.sheet.freeze[1]
@@ -159,7 +159,7 @@ class ExcelPreview(ttk.Frame):
                 spans={start:end for (rr,start),end in self.sheet.column_merges.items() if rr==r}
                 # タイトルはExcel同様に隣の空欄へ表示する（結合セルにはしない）。
                 spans.update({c:min(c+self.sheet.block_width-1,len(row)-1) for c,cell in enumerate(row)
-                              if cell.style in ("spring_title","pressure_title")})
+                              if cell.style in ("spring_title","pressure_title","shaft_title")})
                 covered={c for start,end in spans.items() for c in range(start+1,end+1)}
                 covered.update(cc for (a,b),(d,e) in rectangles.items() if a<=r<=d
                                for cc in range(b,e+1) if (r,cc)!=(a,b))
@@ -175,7 +175,7 @@ class ExcelPreview(ttk.Frame):
                     if right<x0 or left>x0+width:continue
                     fill="#243B53" if cell.style=="header" else "#FFF2C6" if cell.style=="actual" else "#F8FAFC" if r%2 else "white"
                     color="white" if cell.style=="header" else "#175CAD" if cell.style in ("source","link") else "#202B3C"
-                    if cell.style.startswith(("spring","pressure")):fill,color="white","#202B3C"
+                    if cell.style.startswith(("spring","pressure","shaft")):fill,color="white","#202B3C"
                     if (r,c) in self.sheet.checks and cell.cached != 0:fill,color="#FDE5E5","#B42318"
                     cv.create_rectangle(left,y1,right,cell_bottom,fill=fill,outline="#E3E8EF" if cell.borders is None else "")
                     if cell.borders:

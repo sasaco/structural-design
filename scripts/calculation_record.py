@@ -83,6 +83,22 @@ def complete(report, sdc_raw, original, result, profiles):
             layer_map = {l.number: l for l in profile.layers}
             detail["conditions"] = dict(pile_length_m=profile.length, exclusion_m=profile.exclusion,
                                         embedment_m=profile.embedment)
+            # 主表は除外区間も含む全層を示す。有効支点のpiecesだけでは先頭層が欠ける。
+            ncols = len(profile.layers[0].values)
+            detail["layers"] = []
+            for layer in profile.layers:
+                columns = []
+                for col in sorted(set(groups.values())):
+                    kv, fv = layer.values[col]
+                    kfield, ffield = 3+2*ncols+col, 3+col
+                    columns.append(dict(column=col, k1_kN_per_m2=kv, fy_kN_per_m=fv,
+                                        spring_field=kfield, force_field=ffield))
+                    source(op, layer.spring_line, kfield, "押込み 短期第1勾配 K1", kv, "kN/m²")
+                    source(op, layer.force_line, ffield, "押込み 降伏点 Fy", fv, "kN/m")
+                detail["layers"].append(dict(number=layer.number, top_m=layer.top, bottom_m=layer.bottom,
+                    active_top_m=layer.active_top, active_bottom_m=layer.active_bottom,
+                    spring_thickness_m=D(lines[layer.spring_line-1].split(",")[1].strip()),
+                    spring_line=layer.spring_line, force_line=layer.force_line, columns=columns))
             detail["excluded"] = [dict(nodes[n], reason="上端・先端除外または抵抗0のため支点を作成しない")
                                   for n in detail["zero_resistance_nodes"]]
             detail["excluded"] += [dict(nodes[n], reason="杭先端ばねを入力" if "tip" in profiles else "周面工程では保持")

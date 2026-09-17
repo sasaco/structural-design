@@ -13,6 +13,7 @@ from xml.etree import ElementTree as ET
 import fill_jiban_shogen as base
 
 SHEET_NAMES = {"horizontal": "水平地盤ばね", "pressure": "有効抵抗土圧", "shaft": "杭周面ばね", "tip": "杭先端ばね"}
+SHAFT_FORCE_SHEET = "杭周面の支持力"
 METHODS = {"single-layer": "単一層転記", "length-weighted": "長さ加重平均", "midpoint": "中央の層",
            "skip": "境界跨ぎのため保留", "linear-endpoints": "層内線形補間", "integral-average": "積分平均", "endpoints": "上下端採用"}
 NUM = '#,##0.000'
@@ -185,7 +186,7 @@ class ReportBook:
 
     def fit_rows(self):
         for sheet in self.sheets:
-            if sheet.layout in ("horizontal", "pressure"): continue  # 見本の行高と改行を保持する。
+            if sheet.layout in ("horizontal", "pressure", "shaft"): continue  # 見本の行高と改行を保持する。
             for r,row in enumerate(sheet.rows):
                 if r in sheet.merges: continue
                 lines=1
@@ -204,7 +205,7 @@ class ReportBook:
         """混在する表の見出しを改ページごとに再掲。セル参照は全シートで再配置する。"""
         maps={}
         for sheet in self.sheets:
-            if sheet.layout in ("horizontal", "pressure"):
+            if sheet.layout in ("horizontal", "pressure", "shaft"):
                 maps[sheet.name] = {r:r for r in range(len(sheet.rows))}
                 continue
             old_rows,old_heights,old_merges=sheet.rows,sheet.heights,sheet.merges
@@ -313,9 +314,9 @@ class ReportBook:
                 if cell.style == "section": props.update(bold=True, bg_color="#E6EDF5")
                 if cell.style == "note": props.update(text_wrap=True, font_color="#526174")
                 if cell.style == "link": props.update(font_color="#175CAD", underline=True)
-                if cell.style.startswith(("spring", "pressure")):
+                if cell.style.startswith(("spring", "pressure", "shaft")):
                     props.update(font_name="ＭＳ 明朝", font_size=10, align="center")
-                if cell.style in ("spring_title", "pressure_title"): props["text_wrap"] = False
+                if cell.style in ("spring_title", "pressure_title", "shaft_title"): props["text_wrap"] = False
                 if cell.align: props["align"] = cell.align
                 if cell.valign: props["valign"] = {"center":"vcenter"}.get(cell.valign,cell.valign)
                 if cell.borders is not None:
@@ -360,7 +361,7 @@ class ReportBook:
                         ws.write_string(r,c,str(cell.value),style)
             for r,c in sheet.checks:
                 ws.conditional_format(r,c,r,c,{"type":"cell", "criteria":"!=", "value":0, "format":error_format})
-            if sheet.layout in ("horizontal", "pressure"): ws.set_portrait()
+            if sheet.layout in ("horizontal", "pressure", "shaft"): ws.set_portrait()
             else: ws.set_landscape()
             ws.set_paper(9)
             # FitToPagesはExcelで手動改ページを無効にするため、A4横の有効幅へ
@@ -374,7 +375,7 @@ class ReportBook:
                 ws.repeat_rows(0,1)
                 ws.set_zoom(85)
                 ws.print_across()
-            elif sheet.layout == "pressure":
+            elif sheet.layout in ("pressure", "shaft"):
                 ws.set_margins(18/25.4,18/25.4,19/25.4,19/25.4)
                 ws.repeat_rows(0,1)
                 ws.set_zoom(85)
@@ -767,15 +768,238 @@ def build_pressure(book, sheet, source, rows, fixed, src, length, links, decimal
             book.expected.append((source.name,r,7,fixed[ident,field]["after"],ident))
 
 
+def build_shaft(book, spring, force, source, detail, fixed, src, length, links, force_links, k_digits, f_digits):
+    """全節点の負担幅を地層・除外境界で区切り、同じ配置でKとFを表示する。"""
+    geometries = {row["node"]: row["geometry"] for row in detail["nodes"]}
+    geometries.update({row["node"]: row for row in detail["excluded"]})
+    groups = sorted({(g["column"], g["group"]) for g in geometries.values()})
+    cond = detail["conditions"]
+    upper = numeric(cond["exclusion_m"])
+    lower = numeric(cond["pile_length_m"])-numeric(cond["embedment_m"])
+    source.section("周面の抵抗範囲", ["杭長 (m)", "1/β (m)", "根入れ (m)", "有効下端 (m)"])
+    cr = source.add([cond["pile_length_m"], cond["exclusion_m"], cond["embedment_m"], None],
+                    styles={i:"source" for i in range(3)}, formats={i:LENGTH for i in range(4)})
+    source.set_formula(cr,3,length(source.ref(cr,0)-source.ref(cr,2)))
+    source.note("周面は押込みK1/Fyの長さ積分。平均除算・1.2補正・本数の追加乗算なし。先端行の0は周面抵抗です。")
+
+    source.section("周面の全地層", ["KG","列","層","KのSDC行","FのSDC行","層上端 (m)","層下端 (m)",
+                                    "全層厚 (m)","d表層厚 (m)","有効上端 (m)","有効下端 (m)","有効厚 (m)"])
+    layers = {}
+    for col,group in groups:
+        for layer in detail["layers"]:
+            r = source.add([group,col,layer["number"],layer["spring_line"],layer["force_line"],
+                            layer["top_m"],layer["bottom_m"],None,layer["spring_thickness_m"],None,None,None],
+                           styles={i:"source" for i in (5,6,8)},formats={i:LENGTH for i in range(5,12)})
+            source.set_formula(r,7,length(source.ref(r,6)-source.ref(r,5)))
+            source.set_formula(r,9,fn("MAX",source.ref(r,5),source.ref(cr,1)))
+            source.set_formula(r,10,fn("MIN",source.ref(r,6),source.ref(cr,3)))
+            source.set_formula(r,11,fn("MAX",0,length(source.ref(r,10)-source.ref(r,9))))
+            layers[group,layer["number"]] = r
+
+    source.section("周面の表示区間", ["KG","列","層","抵抗区分","区間上端 (m)","区間下端 (m)",
+                                      "区間厚 (m)","K原値 (kN/m²)","F原値 (kN/m)"])
+    segments = {}
+    for col,group in groups:
+        segments[group] = []
+        for layer in detail["layers"]:
+            lr = layers[group,layer["number"]]
+            top,bottom = numeric(layer["top_m"]),numeric(layer["bottom_m"])
+            cuts = {top:source.ref(lr,5),bottom:source.ref(lr,6)}
+            for depth,ref in ((upper,source.ref(cr,1)),(lower,source.ref(cr,3))):
+                if top<depth<bottom: cuts[depth] = ref
+            boundaries = sorted(cuts)
+            values = next(v for v in layer["columns"] if v["column"]==col)
+            for a,b in zip(boundaries,boundaries[1:]):
+                active = a>=upper and b<=lower
+                r = source.add([group,col,layer["number"],"有効" if active else "除外",cuts[a],cuts[b],None,
+                                src("shaft",layer["spring_line"],values["spring_field"]) if active else 0,
+                                src("shaft",layer["force_line"],values["force_field"]) if active else 0],
+                               formats={i:LENGTH for i in (4,5,6)})
+                source.set_formula(r,6,length(source.ref(r,5)-source.ref(r,4)))
+                segments[group].append(dict(layer=layer["number"],top=a,bottom=b,active=active,row=r,
+                                             k=numeric(values["k1_kN_per_m2"]),f=numeric(values["fy_kN_per_m"])))
+
+    source.section("周面の全節点幾何", ["KG","列","節点","前節点","次節点","前深さ (m)","節点深さ (m)",
+                                      "次深さ (m)","負担上端 (m)","負担下端 (m)","負担全幅 (m)","有効幅 (m)"])
+    blocks = []
+    for col,group in groups:
+        block = []
+        for g in sorted((g for g in geometries.values() if g["group"]==group),key=lambda g:numeric(g["depth_m"])):
+            r = source.add([group,col,g["node"],g["previous_node"],g["next_node"],g["previous_depth_m"],
+                            g["depth_m"],g["next_depth_m"],None,None,None,None],
+                           styles={i:"source" for i in (5,6,7)},formats={i:LENGTH for i in range(5,12)})
+            source.set_formula(r,8,length((source.ref(r,5)+source.ref(r,6))/2))
+            source.set_formula(r,9,length((source.ref(r,6)+source.ref(r,7))/2))
+            source.set_formula(r,10,length(source.ref(r,9)-source.ref(r,8)))
+            source.set_formula(r,11,fn("MAX",0,length(fn("MIN",source.ref(r,9),source.ref(cr,3))-
+                                                     fn("MAX",source.ref(r,8),source.ref(cr,1)))))
+            block.append(dict(geometry=g,row=r,pieces=[]))
+        blocks.append(block)
+
+    source.section("周面の節点区間内訳", ["KG","節点","層","抵抗区分","重なり上端 (m)","重なり下端 (m)","内訳幅 (m)"])
+    for (_,group),block in zip(groups,blocks):
+        for node in block:
+            g,gr = node["geometry"],node["row"]
+            for seg in segments[group]:
+                if min(numeric(g["bottom_m"]),seg["bottom"])<=max(numeric(g["top_m"]),seg["top"]): continue
+                sr = seg["row"]
+                r = source.add([group,g["node"],seg["layer"],"有効" if seg["active"] else "除外",None,None,None],
+                               formats={i:LENGTH for i in (4,5,6)})
+                source.set_formula(r,4,fn("MAX",source.ref(gr,8),source.ref(sr,4)))
+                source.set_formula(r,5,fn("MIN",source.ref(gr,9),source.ref(sr,5)))
+                source.set_formula(r,6,fn("MAX",0,length(source.ref(r,5)-source.ref(r,4))))
+                node["pieces"].append((seg,r))
+
+    count = max(sum(len(n["pieces"]) for n in block) for block in blocks)
+    total = count+2
+    node_spans,segment_spans = [],[]
+    main_refs = {}
+    for sheet,kind,digits in ((spring,"k",k_digits),(force,"f",f_digits)):
+        # Normal=Calibri 11では100/95%で結果列が横へ分離する。Excel実機で92%を確認。
+        sheet.layout,sheet.freeze,sheet.print_scale,sheet.block_width = "shaft",(0,0),92,7
+        sheet.widths = [8,8,21.03,8.91,8.91,8.91,20]*len(blocks)
+        sheet.vertical_breaks = list(range(7,len(sheet.widths),7))
+        sheet.rows = [[Cell(style="shaft",number_format="0",borders="") for _ in sheet.widths] for _ in range(total+2)]
+        sheet.heights = {r:18 for r in range(total+1)}
+        sheet.heights.update({0:24,1:48.75,total+1:21.75})
+        sheet.print_last_row = total+1
+        def put(r,c,value=None,fmt="0",align="center",borders="LRTB"):
+            cell = Cell(formula=value if isinstance(value,Expr) else None,value=None if isinstance(value,Expr) else value,
+                        style="shaft",number_format=fmt,align=align,borders=borders)
+            sheet.rows[r][c] = cell
+            return cell
+        prefix = "#,##0" if kind=="k" else "0"
+        result_format = prefix + ("."+"0"*digits if digits else "")
+        headers = ["層番号","層厚\n(m)","鉛直せん断地盤ばね定数\nKv\n(kN/m²)" if kind=="k" else "周面支持力度\nrfk\n(kN/m)",
+                   "分布幅\n(m)",None,"節点番号","各節点の鉛直ばね定数\nKv\n(kN/m)" if kind=="k" else "各節点の周面支持力\nRfk\n(kN)"]
+        for index,((col,group),block) in enumerate(zip(groups,blocks)):
+            c = 7*index
+            sheet.sections.append((f"KG{group} / SDC{col}列目",0,c))
+            put(0,c,"鉛直せん断地盤ばね定数" if kind=="k" else "杭周面の支持力",align="left",borders="").style="shaft_title"
+            for j,h in enumerate(headers): put(1,c+j,h)
+            sheet.column_merges[1,c+3] = c+4
+            r,previous_layer,previous_segment = 2,None,None
+            anchors,node_starts,segment_starts = {},[],[]
+            for node in block:
+                first,gr,g = r,node["row"],node["geometry"]
+                ident = f"shaft:KG{group}:{g['node']}"
+                main_refs[kind,g["node"]] = sheet.ref(first,c+6)
+                (links if kind=="k" else force_links)[ident] = (sheet.name,first,c+5)
+                node_starts.append(first)
+                for j,(seg,pr) in enumerate(node["pieces"]):
+                    sr = seg["row"]
+                    layer_start,segment_start = previous_layer!=seg["layer"],previous_segment!=sr
+                    put(r,c,seg["layer"] if layer_start else None,borders="LR"+("T" if layer_start else ""))
+                    put(r,c+1,source.ref(sr,6) if segment_start else None,fmt="#,##0.000",align="right",borders="LR"+("T" if segment_start else ""))
+                    value_digits = max(0 if kind=="k" else 1,-seg[kind].normalize().as_tuple().exponent)
+                    source_format = prefix+("."+"0"*value_digits if value_digits else "")
+                    put(r,c+2,source.ref(sr,7 if kind=="k" else 8) if segment_start else None,
+                        fmt=source_format,borders="LR"+("T" if segment_start else ""))
+                    if segment_start:
+                        anchors[sr] = r
+                        segment_starts.append(r)
+                    edges = ("T" if j==0 else "")+("B" if j==len(node["pieces"])-1 else "")
+                    put(r,c+3,source.ref(gr,10) if j==0 else None,fmt="#,##0.000",align="right",borders="L"+edges)
+                    put(r,c+4,source.ref(pr,6) if len(node["pieces"])>1 else None,fmt="#,##0.000",align="right",borders="R"+edges)
+                    put(r,c+5,g["node"] if j==0 else None,borders="LR"+edges)
+                    put(r,c+6,fmt=result_format,borders="LR"+edges)
+                    previous_layer,previous_segment = seg["layer"],sr
+                    r += 1
+                if len(node["pieces"])==1:
+                    expr = sheet.ref(anchors[node["pieces"][0][0]["row"]],c+2)*sheet.ref(first,c+3)
+                else:
+                    expr = fn("SUM",*[sheet.ref(anchors[seg["row"]],c+2)*sheet.ref(first+j,c+4)
+                                      for j,(seg,_) in enumerate(node["pieces"])])
+                sheet.set_formula(first,c+6,expr)
+                if kind=="k": node_spans.append((first,r,c,g["node"]))
+            for j in (0,1,2): sheet.rows[r-1][c+j].borders += "B"
+            if kind=="k": segment_spans.extend((a,b,c) for a,b in zip(segment_starts,[*segment_starts[1:],r]))
+            for j in range(7): put(total,c+j)
+            put(total,c,"Σ")
+            put(total,c+1,fn("SUM",*[sheet.ref(rr,c+1) for rr in segment_starts]),fmt="#,##0.000",align="right")
+            put(total,c+3,fn("SUM",*[sheet.ref(rr,c+3) for rr in node_starts]),fmt="#,##0.000",align="right",borders="LTB")
+            put(total,c+4,borders="RTB")
+
+    # 見本の短表は1KG1ページ。長表も区間厚・全幅・結果を重複集計しない。
+    start,capacity = 2,730*100/spring.print_scale-24-48.75
+    while sum(spring.heights[r] for r in range(start,len(spring.rows)))>capacity:
+        end,used = start,0
+        while end<len(spring.rows) and used+spring.heights[end]<=capacity:
+            used += spring.heights[end]
+            end += 1
+        if end>=total: end=total-1
+        safe = next((r for r in range(end,start,-1) if not any(a<r<b for a,b,_,_ in node_spans)),None)
+        end = safe if safe is not None else end
+        for sheet in (spring,force):
+            sheet.page_breaks.append(end)
+            for a,b,c in segment_spans:
+                if a<end<b:
+                    for offset in (1,2):
+                        sheet.rows[end][c+offset].formula = sheet.ref(a,c+offset)
+                        sheet.rows[end][c+offset].number_format = sheet.rows[a][c+offset].number_format
+                    # 層名の先頭が前ページにあっても追えるようにする。
+                    layer_row = next(rr for rr in range(a,1,-1) if sheet.rows[rr][c].value is not None)
+                    sheet.rows[end][c].value = sheet.rows[layer_row][c].value
+            for a,b,c,node in node_spans:
+                if a<end<b:
+                    sheet.rows[end][c+5].value = f"{node}\n（続き）"
+                    sheet.rows[end][c+3].formula = sheet.ref(a,c+3)
+                    sheet.rows[end][c+6].formula = sheet.ref(a,c+6)
+                    sheet.heights[end] = 30
+        start=end
+
+    source.section("周面の幅の照合", ["KG","節点","負担全幅 (m)","内訳幅合計 (m)","幅差 (m)",
+                                    "有効幅 (m)","有効内訳合計 (m)","有効幅差 (m)","周面の扱い"])
+    reasons = {row["node"]:row["reason"] for row in detail["excluded"]}
+    for block in blocks:
+        for node in block:
+            g,gr = node["geometry"],node["row"]
+            r = source.add([g["group"],g["node"],source.ref(gr,10),None,None,source.ref(gr,11),None,None,
+                            reasons.get(g["node"],"周面支点に採用")],formats={i:LENGTH for i in range(2,8)})
+            source.set_formula(r,3,length(fn("SUM",*[source.ref(pr,6) for _,pr in node["pieces"]])))
+            source.set_formula(r,4,length(source.ref(r,3)-source.ref(r,2)))
+            source.set_formula(r,6,length(fn("SUM",0,*[source.ref(pr,6) for seg,pr in node["pieces"] if seg["active"]])))
+            source.set_formula(r,7,length(source.ref(r,6)-source.ref(r,5)))
+            source.checks.extend(((r,4),(r,7)))
+
+    source.section("周面の採用照合", ["KG","列","節点（ばね明細）","支点項目（支持力明細）","K主表値 (kN/m)",
+                                    "K採用再計算","K固定実入力","K差","F主表値 (kN)","F採用再計算","F固定実入力","F差"])
+    for row in detail["nodes"]:
+        ident,node = row["id"],row["node"]
+        r = source.add([row["group"],row["column"],Cell(str(node),style="link",link=links[ident]),
+                        Cell(str(row["output"]["item"]),style="link",link=force_links[ident]),main_refs["k",node],None,
+                        numeric(fixed[ident,4]["after"]),None,main_refs["f",node],None,numeric(fixed[ident,5]["after"]),None],
+                       styles={6:"actual",10:"actual"})
+        for c,field,digits in ((5,4,k_digits),(9,5,f_digits)):
+            source.set_formula(r,c,fn("ROUND",source.ref(r,c-1),digits))
+            source.set_formula(r,c+2,source.ref(r,c)-source.ref(r,c+1))
+            source.rows[r][c].number_format = '#,##0'+('.'+'0'*digits if digits else '')
+            source.checks.append((r,c+2))
+            book.expected.append((source.name,r,c,fixed[ident,field]["after"],ident))
+    for title,offsets in (("周面ばね実入力 (kN/m)",[4,7,10,11,12,13]),("周面制限値実入力 (kN)",[5,6,8,9])):
+        source.section(title,["KG","列","節点","支点項目",*[fixed[detail["nodes"][0]["id"],i]["label"] for i in offsets]])
+        for row in detail["nodes"]:
+            source.add([row["group"],row["column"],row["node"],row["output"]["item"],
+                        *[numeric(fixed[row["id"],i]["after"]) for i in offsets]],styles={i:"actual" for i in range(4,4+len(offsets))})
+    source.section("周面の正確な計算記録", ["節点ごとの丸め前値"])
+    for row in detail["nodes"]:
+        source.note(f"KG{row['group']} 節点{row['node']} K: {row['raw_k1_kN_per_m']} / F: {row['raw_fy_kN']}")
+
+
 def build(report):
     record, config = report["calculation"], report["configuration"]
     summary = Sheet("変換結果")
     sheets = {op:Sheet(SHEET_NAMES[op]) for op in SHEET_NAMES if op in report["details"]}
     source_sheet = Sheet("入力根拠")
-    book = ReportBook([summary,*sheets.values(),source_sheet])
+    force_sheet = Sheet(SHAFT_FORCE_SHEET) if "shaft" in sheets else None
+    main_sheets = []
+    for op,sheet in sheets.items():
+        main_sheets.append(sheet)
+        if op=="shaft": main_sheets.append(force_sheet)
+    book = ReportBook([summary,*main_sheets,source_sheet])
     state = "モデル保存と同一実行" if report.get("mode") == "saved" else "計算確認・モデル未保存"
     for sheet in book.sheets:
-        if sheet.name in (SHEET_NAMES["horizontal"],SHEET_NAMES["pressure"]): continue
+        if sheet.name in (SHEET_NAMES["horizontal"],SHEET_NAMES["pressure"],SHEET_NAMES["shaft"],SHAFT_FORCE_SHEET): continue
         sheet.note(sheet.name, "title")
         sheet.note(state + "　" + report.get("created_at", ""))
         sheet.note("青文字：原値　黄色：変換時の実入力（固定）　数式：再計算値。条件変更時はアプリから再実行してください。")
@@ -814,111 +1038,43 @@ def build(report):
     def length(expr): return fn("ROUND",expr,length_digits)
     source_sheet.note(f"座標演算の保持小数桁: {length_digits}（入力座標の最大精度＋中点の1桁）。積分・補間の結果は途中で丸めません。")
     detail_links = {}
-    for op,sheet in sheets.items():
-        if op in ("horizontal","pressure"): continue
-        detail=report["details"][op]
-        rows=detail.get("members",detail.get("nodes",[]))
+    force_links = {}
+    if "tip" in sheets:
+        sheet = sheets["tip"]
+        rows = report["details"]["tip"]["nodes"]
         sheet.widths = [8,8,10,17,15,15,15,15,15,15,15,15]
-        if op=="shaft":
-            sheet.note("既存画面方式：押込みK1/Fyを正負へ配置。長さ積分後に丸め、平均の除算・1.2補正・本数の追加乗算はしません。")
-            sheet.section("節点別の結果",["KG","列","節点","有効長\n(m)","K丸め前\n(kN/m)","K再計算\n(kN/m)","K実入力\n(kN/m)","K差","F丸め前\n(kN)","F再計算\n(kN)","F実入力\n(kN)","F差"])
-        else:
-            sheet.note("SDCの短期K1/K2・押込みFy/Fuを転記。負側制限値F1−/F2−は空欄のまま転記します。")
-            sheet.section("杭先端の結果",["KG","列","先端節点","K1再計算\n(kN/m)","K1実入力\n(kN/m)","K2再計算\n(kN/m)","K2実入力\n(kN/m)","Fy再計算\n(kN)","Fy実入力\n(kN)","Fu再計算\n(kN)","Fu実入力\n(kN)"])
-        summaries={}
+        sheet.note("SDCの短期K1/K2・押込みFy/Fuを転記。負側制限値F1−/F2−は空欄のまま転記します。")
+        sheet.section("杭先端の結果",["KG","列","先端節点","K1再計算\n(kN/m)","K1実入力\n(kN/m)","K2再計算\n(kN/m)","K2実入力\n(kN/m)","Fy再計算\n(kN)","Fy実入力\n(kN)","Fu再計算\n(kN)","Fu実入力\n(kN)"])
+        summaries = {}
         for row in rows:
-            ident=row["id"]
+            ident = row["id"]
             def actual(field): return Cell(numeric(fixed[ident,field]["after"]),style="actual")
-            if op=="shaft": values=[row["group"],row["column"],row["node"],None,None,None,actual(4),None,None,None,actual(5),None]
-            else: values=[row["group"],row["column"],row["node"],None,actual(4),None,actual(7),None,actual(5),None,actual(8)]
-            r=sheet.add(values)
-            summaries[ident]=r
-            detail_links[ident]=(sheet.name,r,0)
-            checks = [(5,6,7,4),(9,10,11,5)] if op=="shaft" else [(3,4,None,4),(5,6,None,7),(7,8,None,5),(9,10,None,8)]
-            for calc,actual_col,delta,f in checks:
-                if row.get("method") != "skip": book.expected.append((sheet.name,r,calc,fixed[ident,f]["after"],ident))
-                digits=max(0,-numeric(fixed[ident,f]["after"]).normalize().as_tuple().exponent) if fixed[ident,f]["after"] is not None else 0
-                sheet.rows[r][calc].number_format='#,##0'+('.'+'0'*digits if digits else '')
-                if delta is not None:
-                    sheet.set_formula(r,delta,sheet.ref(r,calc)-sheet.ref(r,actual_col))
-                    sheet.checks.append((r,delta))
-        geometries={}
-        if op=="shaft":
-            cond=detail["conditions"]
-            sheet.section("抵抗を考慮する範囲",["杭長 (m)","1/β (m)","根入れ (m)","有効下端 (m)"])
-            cr=sheet.add([cond["pile_length_m"],cond["exclusion_m"],cond["embedment_m"],None],styles={0:"source",1:"source",2:"source"},formats={i:LENGTH for i in range(4)})
-            sheet.set_formula(cr,3,length(sheet.ref(cr,0)-sheet.ref(cr,2)))
-            sheet.section("節点の負担区間（隣接座標の中点）",["KG","列","節点","前節点","次節点","前深さ\n(m)","節点深さ\n(m)","次深さ\n(m)","負担上端\n(m)","負担下端\n(m)","負担長\n(m)","除外長\n(m)"])
-            for row in rows:
-                g=row["geometry"]
-                r=sheet.add([row["group"],row["column"],row["node"],g["previous_node"],g["next_node"],g["previous_depth_m"],g["depth_m"],g["next_depth_m"],None,None,None,None],styles={5:"source",6:"source",7:"source"},formats={i:LENGTH for i in range(5,12)})
-                sheet.set_formula(r,8,length((sheet.ref(r,5)+sheet.ref(r,6))/2))
-                sheet.set_formula(r,9,length((sheet.ref(r,6)+sheet.ref(r,7))/2))
-                sheet.set_formula(r,10,length(sheet.ref(r,9)-sheet.ref(r,8)))
-                sheet.set_formula(r,11,length(sheet.ref(r,10)-sheet.ref(summaries[row["id"]],3)))
-                geometries[row["id"]]=r
-        else:
-            sheet.section("杭頭・最深節点と杭長",["KG","列","杭頭節点","先端節点","x座標\n(m)","杭頭y\n(m)","先端y\n(m)","座標差\n(m)","SDC杭長\n(m)"])
-            for row in rows:
-                g=row["geometry"]
-                r=sheet.add([row["group"],row["column"],g["head_node"],row["node"],row["x_m"],g["origin_y_m"],row["y_m"],None,row["pile_length_m"]],styles={i:"source" for i in (4,5,6,8)},formats={i:LENGTH for i in range(4,9)})
-                sheet.set_formula(r,7,length(sheet.ref(r,6)-sheet.ref(r,5)))
-                sr=summaries[row["id"]]
-                for c,key,line in ((3,"k1_kN_per_m","spring_line"),(5,"k2_kN_per_m","spring_line"),(7,"fy_kN","force_line"),(9,"fu_kN","force_line")):
-                    sheet.set_formula(sr,c,src(op,row[line],row["source_fields"][key]))
-        if op=="shaft":
-            sheet.section("地層と有効な重なり",["KG","節点","層","層上端\n(m)","層下端\n(m)","全層厚\n(m)","有効上端\n(m)","有効下端\n(m)","重なり上端\n(m)","重なり下端\n(m)","有効長\n(m)"])
-        piece_rows={}
+            r = sheet.add([row["group"],row["column"],row["node"],None,actual(4),None,actual(7),None,actual(5),None,actual(8)])
+            summaries[ident] = r
+            detail_links[ident] = (sheet.name,r,0)
+            for calc,f in ((3,4),(5,7),(7,5),(9,8)):
+                book.expected.append((sheet.name,r,calc,fixed[ident,f]["after"],ident))
+                digits = max(0,-numeric(fixed[ident,f]["after"]).normalize().as_tuple().exponent) if fixed[ident,f]["after"] is not None else 0
+                sheet.rows[r][calc].number_format = '#,##0'+('.'+'0'*digits if digits else '')
+        sheet.section("杭頭・最深節点と杭長",["KG","列","杭頭節点","先端節点","x座標\n(m)","杭頭y\n(m)","先端y\n(m)","座標差\n(m)","SDC杭長\n(m)"])
         for row in rows:
-            if op=="tip": break
-            gr=geometries[row["id"]]
-            prs=[]
-            for p in row["pieces"]:
-                number=row.get("member",row.get("node"))
-                r=sheet.add([row["group"],number,p["layer"],numeric(p["layer_top_m"]),numeric(p["layer_bottom_m"]),None,None,None,None,None,None],styles={3:"source",4:"source"},formats={i:LENGTH for i in range(3,11)})
-                sheet.set_formula(r,5,length(sheet.ref(r,4)-sheet.ref(r,3)))
-                sheet.set_formula(r,6,fn("MAX",sheet.ref(r,3),sheet.ref(cr,1)))
-                sheet.set_formula(r,7,fn("MIN",sheet.ref(r,4),sheet.ref(cr,3)))
-                sheet.set_formula(r,8,fn("MAX",sheet.ref(gr,8),sheet.ref(r,6)))
-                sheet.set_formula(r,9,fn("MIN",sheet.ref(gr,9),sheet.ref(r,7)))
-                sheet.set_formula(r,10,fn("MAX",0,length(sheet.ref(r,9)-sheet.ref(r,8))))
-                prs.append(r)
-            piece_rows[row["id"]]=prs
-        if op=="shaft":
-            sheet.section("周面K1・Fyの区間積分",["KG","節点","層","KのSDC行","FのSDC行","有効長\n(m)","原値K1\n(kN/m²)","原値Fy\n(kN/m)","K1×長さ\n(kN/m)","Fy×長さ\n(kN)"])
-        for row in rows:
-            if op=="tip": break
-            sr=summaries[row["id"]]
-            gr=geometries[row["id"]]
-            prs=piece_rows[row["id"]]
-            calc_rows=[]
-            for p,pr in zip(row["pieces"],prs):
-                number=row["node"]
-                r=sheet.add([row["group"],number,p["layer"],p["spring_line"],p["force_line"],sheet.ref(pr,10),src(op,p["spring_line"],p["spring_field"]),src(op,p["force_line"],p["force_field"]),None,None],styles={6:"source",7:"source"},formats={5:LENGTH})
-                sheet.set_formula(r,8,sheet.ref(r,5)*sheet.ref(r,6))
-                sheet.set_formula(r,9,sheet.ref(r,5)*sheet.ref(r,7))
-                calc_rows.append(r)
-            sheet.set_formula(sr,3,fn("SUM",*[sheet.ref(r,10) for r in prs]))
-            sheet.set_formula(sr,4,fn("SUM",*[sheet.ref(r,8) for r in calc_rows]))
-            sheet.set_formula(sr,8,fn("SUM",*[sheet.ref(r,9) for r in calc_rows]))
-            sheet.set_formula(sr,5,fn("ROUND",sheet.ref(sr,4),config["shaft_k_decimals"]))
-            sheet.set_formula(sr,9,fn("ROUND",sheet.ref(sr,8),config["shaft_force_decimals"]))
-        if op=="shaft":
-            sheet.section("周面工程の除外節点",["KG","列","節点","深さ (m)","負担上端 (m)","負担下端 (m)"])
-            for row in detail["excluded"]:
-                sheet.add([row["group"],row["column"],row["node"],row["depth_m"],row["top_m"],row["bottom_m"]],formats={i:LENGTH for i in range(3,6)})
-                sheet.note(row["reason"])
-        if op in ("shaft","tip"):
-            for title,offsets in (("ばね実入力 (kN/m)",[4,7,10,11,12,13]),("制限値実入力 (kN)",[5,6,8,9])):
-                labels=[fixed[rows[0]["id"],i]["label"] for i in offsets]
-                sheet.section(title,["KG","列","節点","支点項目",*labels])
-                for row in rows:
-                    sheet.add([row["group"],row["column"],row["node"],row["output"]["item"],
-                               *[numeric(fixed[row["id"],i]["after"]) for i in offsets]],styles={i:"actual" for i in range(4,4+len(offsets))})
+            g = row["geometry"]
+            r = sheet.add([row["group"],row["column"],g["head_node"],row["node"],row["x_m"],g["origin_y_m"],row["y_m"],None,row["pile_length_m"]],styles={i:"source" for i in (4,5,6,8)},formats={i:LENGTH for i in range(4,9)})
+            sheet.set_formula(r,7,length(sheet.ref(r,6)-sheet.ref(r,5)))
+            sr = summaries[row["id"]]
+            for c,key,line in ((3,"k1_kN_per_m","spring_line"),(5,"k2_kN_per_m","spring_line"),(7,"fy_kN","force_line"),(9,"fu_kN","force_line")):
+                sheet.set_formula(sr,c,src("tip",row[line],row["source_fields"][key]))
+        for title,offsets in (("ばね実入力 (kN/m)",[4,7,10,11,12,13]),("制限値実入力 (kN)",[5,6,8,9])):
+            labels = [fixed[rows[0]["id"],i]["label"] for i in offsets]
+            sheet.section(title,["KG","列","節点","支点項目",*labels])
+            for row in rows:
+                sheet.add([row["group"],row["column"],row["node"],row["output"]["item"],
+                           *[numeric(fixed[row["id"],i]["after"]) for i in offsets]],styles={i:"actual" for i in range(4,4+len(offsets))})
         sheet.section("Python Decimalの丸め前文字列",["KG","対象","項目","正確な計算記録"])
         for row in rows:
-            originals = [("K",row["raw_k1_kN_per_m"]),("F",row["raw_fy_kN"])] if op=="shaft" else [(k,row[k]) for k in ("k1_kN_per_m","k2_kN_per_m","fy_kN","fu_kN")]
-            for label,value in originals: sheet.note(f"KG{row['group']} {row.get('member',row.get('node'))} {label}: {value if value is not None else '保留'}")
+            for label in ("k1_kN_per_m","k2_kN_per_m","fy_kN","fu_kN"):
+                value = row[label]
+                sheet.note(f"KG{row['group']} {row['node']} {label}: {value if value is not None else '保留'}")
 
     source_sheet.section("SDC見出しと原行（文字列保存）",["原行"])
     for row in record["sdc_context"]: source_sheet.note(f"SDC {row['line']}行: {row['raw']}")
@@ -935,6 +1091,9 @@ def build(report):
     if "pressure" in sheets:
         build_pressure(book,sheets["pressure"],source_sheet,report["details"]["pressure"]["members"],
                        fixed,src,length,detail_links,config["pressure_decimals"])
+    if "shaft" in sheets:
+        build_shaft(book,sheets["shaft"],force_sheet,source_sheet,report["details"]["shaft"],
+                    fixed,src,length,detail_links,force_links,config["shaft_k_decimals"],config["shaft_force_decimals"])
 
     summary.note("モデル: "+report["sources"][1]["path"])
     summary.note(f"計算対象 {len(record['targets'])}件　変更 {record['counts']['変更']}件　追加 {record['counts']['追加']}件　同値 {record['counts']['同値']}件　保留 {record['counts']['保留']}件")
@@ -957,7 +1116,8 @@ def build(report):
             labels=[fixed[node_targets[0]['id'],i]['label'] for i in offsets]
             summary.section(title,["計算明細","KG","列","節点","支点項目","方向",*labels])
             for t in node_targets:
-                summary.add([Cell(SHEET_NAMES[t['operation']],style='link',link=detail_links[t['id']]),t['group'],t['column'],t['number'],t['item'],'Y',
+                link = force_links.get(t['id'],detail_links[t['id']]) if offsets[0]==5 else detail_links[t['id']]
+                summary.add([Cell(link[0],style='link',link=link),t['group'],t['column'],t['number'],t['item'],'Y',
                              *[numeric(fixed[t['id'],i]['after']) for i in offsets]],styles={i:'actual' for i in range(6,6+len(offsets))})
     summary.widths=[18,7,7,10,11,10,15,15,15,15,15,15]
     summary.section("変更前後（空欄と0を区別）",["処理","KG","対象","番号","入力欄","変更前","実入力","差","処理結果","空欄の変更"])
