@@ -32,7 +32,6 @@ class App:
         self.last_saved = None
         self.paths = {key: tk.StringVar() for key in ("sdc", "ndu", "output")}
         self.groups = tk.StringVar()
-        self.direction = tk.StringVar(value="右押し")
         self.overwrite = tk.BooleanVar(value=False)
         self.auto_open = tk.BooleanVar(value=True)
         self.excel_output = tk.BooleanVar(value=True)
@@ -41,7 +40,7 @@ class App:
         self.controls = []
         self.build_ui()
         self.output_changed()
-        for variable in [self.groups, self.direction, self.overwrite, self.excel_output,
+        for variable in [self.groups, self.overwrite, self.excel_output,
                          *self.paths.values(), *self.operations.values()]:
             variable.trace_add("write", self.invalidate)
         self.poll_id = root.after(100, self.poll)
@@ -105,14 +104,8 @@ class App:
             self.operation_buttons[key] = button
         self.group_selector = KGSelection(settings, self.paths["ndu"], self.paths["sdc"], self.groups)
         self.group_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
-        mapping = ttk.Frame(settings)
-        mapping.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        ttk.Label(mapping, text="土圧の方向").pack(side="left")
-        self.direction_box = self.control(ttk.Combobox(mapping, textvariable=self.direction, state="readonly",
-                                                       values=("右押し", "左押し"), width=10))
-        self.direction_box.pack(side="left", padx=8)
         ttk.Label(settings, style="Hint.TLabel",
-                  text="対応：右基礎SDCの直角方向・短期。モデル列は左から右へ指定。\n"
+                  text="対応：右基礎SDCの直角方向・短期。指定したSDC列を各項目に使用します。\n"
                        "周面は既存画面方式（押込みK1を正負の全勾配、Fyを正負の両制限値に設定）。",
                   justify="left", wraplength=570).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
         destination = ttk.LabelFrame(form, text="3  保存先", padding=12)
@@ -164,7 +157,6 @@ class App:
         self.group_selector.set_locked(self.busy)
         if self.busy:
             return
-        self.direction_box.configure(state="readonly")
         for widget in (self.output_entry, self.output_button):
             widget.configure(state="disabled" if self.overwrite.get() else "normal")
 
@@ -205,7 +197,7 @@ class App:
             Path(self.paths["sdc"].get().strip()), Path(self.paths["ndu"].get().strip()),
             operations=tuple(key for key, selected in self.operations.items() if selected.get()),
             groups=self.group_selector.selection(),
-            push_direction="right" if self.direction.get() == "右押し" else "left",
+            push_direction="direct",
             shaft_profile="existing-screen",
             require_matching_lengths=True,
         )

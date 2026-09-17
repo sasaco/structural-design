@@ -19,6 +19,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
 import excel_report as report
+from excel_test_helpers import sheet_xml, source_cell, print_names
 from sdc_converter_app import App
 from test_fill_pile_tip_suppot_info import sdc_bytes
 from test_fill_suppot_info import ndu_bytes
@@ -34,7 +35,7 @@ class WorkbookTests(unittest.TestCase):
         record=self.plan.report['calculation']
         self.assertEqual(len(record['targets']),207)
         self.assertEqual(len(record['fields']),846)
-        self.assertEqual([s.name for s in self.plan.workbook.sheets],['変換結果','水平地盤ばね','有効抵抗土圧','杭周面ばね','杭周面の支持力','杭先端ばね','入力根拠'])
+        self.assertEqual([s.name for s in self.plan.workbook.sheets],['水平地盤ばね','有効抵抗土圧','杭周面ばね','杭周面の支持力','杭先端ばね'])
         details=self.plan.report['details']
         for op,count in [('horizontal',90),('pressure',90),('shaft',72)]:
             self.assertEqual(sum(len(r['pieces']) for r in details[op].get('members',details[op].get('nodes',[]))),count)
@@ -65,38 +66,39 @@ class WorkbookTests(unittest.TestCase):
             normal=styles.find('m:fonts/m:font',ns)
             self.assertEqual(normal.find('m:name',ns).attrib['val'],'Calibri')
             self.assertEqual(normal.find('m:scheme',ns).attrib['val'],'none')
-            for i in range(1,8):
-                root=ET.fromstring(archive.read(f'xl/worksheets/sheet{i}.xml'))
-                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3,4,5,6) else 'landscape')
+            for sheet in self.plan.workbook.sheets:
+                root=sheet_xml(archive,sheet.name)
+                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait')
                 self.assertLessEqual(int(root.find('m:pageSetup',ns).attrib.get('scale','100')),100)
-                if i in (2,3,4,5):
-                    self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[9,18] if i==3 else [7,14])
-                    self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
-                elif i==6:
-                    self.assertIsNone(root.find('m:rowBreaks',ns))
-                    self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
-                else:
-                    self.assertIsNotNone(root.find('m:rowBreaks',ns))
-                    self.assertIsNotNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
+                self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
+                expected_breaks=[] if sheet.layout=='tip' else [9,18] if sheet.layout=='pressure' else [7,14]
+                self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],expected_breaks)
                 self.assertFalse(root.findall('.//m:c[@t="e"]',ns))
+                self.assertFalse(root.findall('m:hyperlinks/m:hyperlink',ns))
+                self.assertFalse(root.findall('m:conditionalFormatting',ns))
+                self.assertTrue(all('!' not in f.text for f in root.findall('.//m:f',ns)))
             workbook=ET.fromstring(archive.read('xl/workbook.xml'))
-            self.assertEqual(len(workbook.findall('.//m:definedName[@name="_xlnm.Print_Area"]',ns)),7)
+            self.assertEqual(len(workbook.findall('.//m:definedName[@name="_xlnm.Print_Area"]',ns)),5)
+            props=ET.fromstring(archive.read('docProps/custom.xml'))
+            metadata={p.get('name'):list(p)[0].text for p in props}
+            self.assertEqual(metadata['SDCConverter.RunId'],self.plan.report['run_id'])
+            self.assertEqual(metadata['SDCConverter.Mode'],'preview')
+            self.assertEqual(metadata['SDCConverter.Status'],'計算確認・モデル未保存')
 
     def test_change_one_source_column_recalculates_only_that_pile_and_keeps_snapshot(self):
         book=report.build(self.plan.report)
-        source=book.sheet('入力根拠')
-        r=next(r for r,row in enumerate(source.rows) if len(row)==7 and row[0].value=='水平地盤ばね' and row[1].value==174 and row[2].value==9)
-        source.rows[r][5].value+=100
+        fixed=[check.expected for check in book.expected]
+        source_cell(book,'horizontal',174,9).value+=100
         book.recalculate(verify=False)
         for target,delta in [('horizontal:KG4:98',100),('horizontal:KG6:148',0)]:
-            name,rr,c,expected,_=next(x for x in book.expected if x[-1]==target)
-            self.assertEqual(book.value(name,rr,c),float(expected)+delta)
-            self.assertEqual(book.sheet(name).rows[rr][c+1].value,D(expected))
+            check=next(x for x in book.expected if x.target==target)
+            self.assertEqual(check.value(book),float(check.expected)+delta)
+        self.assertEqual(fixed,[check.expected for check in book.expected])
         with self.assertRaisesRegex(app.InputError,'KG4:98'):book.recalculate()
 
     def test_selected_operations_direction_and_digits(self):
         plan=app.prepare(replace(self.request,operations=('shaft','tip'),groups=('5:2',),shaft_k_decimals=3,shaft_force_decimals=4))
-        self.assertEqual(len(plan.workbook.sheets),5)
+        self.assertEqual(len(plan.workbook.sheets),3)
         self.assertEqual(len(plan.report['calculation']['targets']),21)
         left=app.prepare(replace(self.request,operations=('pressure',),push_direction='left',pressure_cross_layer='endpoints',pressure_decimals=3))
         self.assertTrue(all(r['pressure_column']==r['column'] for r in left.report['details']['pressure']['members']))
@@ -114,7 +116,8 @@ class WorkbookTests(unittest.TestCase):
         gui=App(root)
         gui.excel_preview.show(self.plan.workbook)
         root.update_idletasks()
-        self.assertEqual(len(gui.excel_preview.sheet_box['values']),7)
+        self.assertEqual(len(gui.excel_preview.sheet_box['values']),5)
+        self.assertEqual(gui.excel_preview.sheet.name,'水平地盤ばね')
         for sheet in self.plan.workbook.sheets:
             gui.excel_preview.sheet_name.set(sheet.name)
             gui.excel_preview.select_sheet()
@@ -204,7 +207,7 @@ class ExcelSaveTests(unittest.TestCase):
         self.assertEqual(next(self.folder.glob('*.xlsx')).read_bytes(),b'other process')
 
     def test_tip_only_missing_other_tables_and_nonconsecutive_nodes(self):
-        self.assertEqual([s.name for s in self.plan.workbook.sheets],['変換結果','杭先端ばね','入力根拠'])
+        self.assertEqual([s.name for s in self.plan.workbook.sheets],['杭先端ばね'])
         row=self.plan.report['details']['tip']['nodes'][0]
         self.assertEqual(row['node'],405)
         self.assertEqual(row['k1_kN_per_m'],D('100.125'))

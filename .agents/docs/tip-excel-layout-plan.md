@@ -64,7 +64,7 @@
 | ファイル・箇所 | 確認した役割・影響 |
 | --- | --- |
 | [fill_pile_tip_suppot_info.py](../../scripts/fill_pile_tip_suppot_info.py) `parse_sdc()`、`make_plan()`、`TipValues.fields()` | SDCのf/g表、最深節点、杭長、10欄配置を決定する。今回の変更対象にしない |
-| [fill_jiban_shogen.py](../../scripts/fill_jiban_shogen.py) `parse_groups()`、`collect_members()` | 重複KG/列・鉛直性・連続性・SDC列と左右順を検証する。規則は維持 |
+| [fill_jiban_shogen.py](../../scripts/fill_jiban_shogen.py) `parse_groups()`、`collect_members()` | 重複KG・鉛直性・連続性を検証。2026-09-18の指定によりSDC列の共用・逆順対応を許可 |
 | [fill_suppot_info.py](../../scripts/fill_suppot_info.py) `render_ndu()`、ケース同期 | 既存支点の更新、新規追加、支点数とケース行を管理。規則は維持 |
 | [calculation_record.py](../../scripts/calculation_record.py) 153行付近、`complete()` | tip原値4種、SDC行/CSV欄、幾何、全10欄の変更前後を保持。今回必要な値は既に揃っている |
 | [excel_report.py](../../scripts/excel_report.py) `build()` 1042～1077行付近 | 現行先端主表の結果・幾何・実入力・十進文字列を生成。主な置換箇所 |
@@ -313,7 +313,7 @@ GUIは新しい専用書式で明朝・白地を適用し、A1等の文字をA�
 
 - K1/K2/Fy/Fuは正数必須、Fu≧Fy。0、負値、NaN等は拒否する。K1とK2、FyとFuは独立した値。
 - 負側制限値は空欄。元NDUに0があれば、空欄への変更として記録する。空欄と0を同一視しない。
-- KG番号・SDC列の重複は拒否。SDC列の昇順に並べた杭のx座標は増加する必要がある。
+- KG番号の重複は拒否。2026-09-18の指定により、SDC列の重複およびx座標順によらない対応は許可する。
 - 指定引数の順序変更と、SDC列の左右逆対応は別問題。`6:3 4:1` は許容、`6:1 4:2` は拒否した。
 - 単独選択 `5:1` は現行CLI共通APIで許容され、KG5の先端147へSDC1列を参照する。KG番号からSDC列を推定しない。
 - SDCは1つの杭長を持ち、対象各杭の座標差と一致しなければ拒否。同一実行内の異なる杭長は現在の対応範囲外。別の杭長を持つ整合したSDC/NDUの組は許容する。

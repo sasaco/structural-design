@@ -26,11 +26,13 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(model.elements[7], (10, 30))
         self.assertEqual(preview.selected_elements(model, "4:1 5:2"), ({7, 8}, {4: 1, 5: 2}))
         self.assertEqual(preview.selected_elements(model, "5:1"), ({8}, {5: 1}))
+        self.assertEqual(preview.selected_elements(model, "4:3 5:3"), ({7, 8}, {4: 3, 5: 3}))
+        self.assertEqual(preview.selected_elements(model, "4:3 5:1"), ({7, 8}, {4: 3, 5: 1}))
         self.assertEqual(preview.selected_elements(model, ""), (set(), {}))
 
     def test_invalid_mapping_missing_reversed_and_overlapping_ranges(self):
         model = preview.parse_model(fixture())
-        for text in ("4:", "0:1", "4:1 5:1", "4:1 4:2", "999:1"):
+        for text in ("4:", "0:1", "4:1 4:2", "999:1"):
             with self.subTest(text=text), self.assertRaises(preview.base.InputError):
                 preview.selected_elements(model, text)
         for change in (b"99,7,6", b"99,6,7", b"99,7,8"):
@@ -84,13 +86,15 @@ class LivePreviewTests(unittest.TestCase):
         self.groups.set("5:1")
         self.assertEqual(self.red_members(), {8})
         self.assertEqual(self.view.canvas.itemcget("element:7", "fill"), preview.NORMAL)
-        for text in ("", "5:", "999:1", "4:1 5:1"):
+        for text in ("", "5:", "999:1", "4:1 4:2"):
             self.groups.set(text)
             self.assertEqual(self.red_members(), set())
             self.assertFalse(self.view.canvas.find_withtag("member-label"))
         self.groups.set("4:1 5:2")
         self.assertEqual(self.red_members(), {7, 8})
         self.assertEqual(len(self.view.canvas.find_withtag("member-label")), 2)
+        self.groups.set("4:3 5:3")
+        self.assertEqual(self.red_members(), {7, 8})
         self.view.show_numbers.set(False)
         self.view.draw()
         self.assertFalse(self.view.canvas.find_withtag("member-label"))

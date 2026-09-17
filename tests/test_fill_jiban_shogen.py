@@ -125,9 +125,12 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(app.select_value(member, overlaps, "midpoint"), D(300))
 
     def test_group_mapping_rejects_duplicates(self):
-        for items in [["4:1", "4:2"], ["4:1", "5:1"], ["4=1"]]:
+        for items in [["4:1", "4:2"], ["4=1"]]:
             with self.assertRaises(app.InputError):
                 app.parse_groups(items)
+
+    def test_group_mapping_allows_shared_sdc_column(self):
+        self.assertEqual(app.parse_groups(["4:3", "5:3", "6:1"]), {4: 3, 5: 3, 6: 1})
 
 
 class FileTests(unittest.TestCase):

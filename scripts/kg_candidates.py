@@ -18,6 +18,7 @@ class Candidate:
     end: int | None
     length: Decimal | None
     reason: str
+    x: Decimal | None = None
 
     @property
     def enabled(self):
@@ -49,7 +50,7 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
             error = "SDCを読み込めません：" + str(exc)
     candidates = []
     for group in groups:
-        start = end = length = None
+        start = end = length = x = None
         reason = ""
         try:
             fields = ndu.fields(f"KGInfo{group}", 3)
@@ -57,6 +58,8 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
             # 端節点、鉛直性、連続性、欠損も変換本体と同じ条件で確認する。
             members = base.collect_members(ndu, {group: 1})
             length = sum((member.bottom - member.top for member in members), base.ZERO)
+            joint = ndu.fields(f"ElementInfo{members[0].number}", 6)[4]
+            x = base.number(ndu.fields(f"JointXY{base.integer(joint, '節点番号')}", 2)[0], "杭のx座標")
             if thickness is None:
                 reason = "SDC未確認"
             elif round_length(length) != round_length(thickness):
@@ -64,7 +67,7 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
                 reason = f"長さ不一致（差 {difference:.3f} m）"
         except (ValueError, ArithmeticError, UnicodeError) as exc:
             reason = str(exc)
-        candidates.append(Candidate(group, start, end, length, reason))
+        candidates.append(Candidate(group, start, end, length, reason, x))
     return Catalog(tuple(candidates), thickness, columns, error)
 
 
@@ -82,3 +85,18 @@ def validate_groups(catalog: Catalog, groups: dict[int, int]) -> None:
             raise base.InputError(f"KGInfo{group}は選択できません：{item.reason}")
         if column not in catalog.columns:
             raise base.InputError(f"SDCに{column}列目がありません。")
+
+
+def assign_columns(catalog: Catalog, selected: list[int], direction: str) -> dict[int, int]:
+    """選択杭をx座標順に並べ、押す側から1・2・3（以後3）を割り当てる。"""
+    if direction not in ("right", "left"):
+        raise base.InputError("列の自動設定は right / left を指定してください。")
+    # 現在の手入力列ではなく、候補と選択KGの妥当性を確認する。
+    validate_groups(catalog, dict.fromkeys(selected, 1))
+    candidates = {item.group: item for item in catalog.candidates}
+    ordered = sorted(selected, key=lambda group: (candidates[group].x, group))
+    count = len(ordered)
+    groups = {group: min(count-index if direction == "right" else index+1, 3)
+              for index, group in enumerate(ordered)}
+    validate_groups(catalog, groups)
+    return groups

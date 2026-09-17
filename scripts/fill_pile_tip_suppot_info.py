@@ -8,7 +8,7 @@ F1+=降伏、F2+=終局、負側制限値は空欄。長さ換算・周面抵抗
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal as D, DecimalException
 import hashlib
 import json
@@ -18,6 +18,7 @@ import sys
 
 import fill_jiban_shogen as base
 import fill_suppot_info as support
+import sdc_columns
 
 InputError = base.InputError
 
@@ -41,28 +42,50 @@ class Profile:
     values: dict[int, TipValues]
     spring_line: int
     force_line: int
+    sources: dict[int, dict[str, sdc_columns.SourceColumn]] = field(default_factory=dict)
+    interpretation: str = "numbered"
+
+
+@dataclass(frozen=True)
+class TipTable:
+    values: dict[int, tuple[D, ...]]
+    sources: dict[int, tuple[sdc_columns.SourceColumn, ...]]
+    line: int
+    layout: sdc_columns.ColumnLayout
+    interpretation: str
 
 
 def read_tip_table(lines: list[str], title: str, labels: list[str], n: int,
-                   begin: int, end: int) -> tuple[list[D], int]:
+                   begin: int, end: int, *, allow_omitted=False) -> TipTable:
     index = support.locate(lines, title, begin, end)
     if index + 3 >= end:
         raise InputError(f"SDC『{title}』の見出し・値が不足しています")
     split = lambda i: [v.strip() for v in lines[i].split(",")]
-    width = len(labels) * n
     groups = split(index + 1)
-    expected = [label if j == 0 else "" for label in labels for j in range(n)]
-    # 上段の結合見出しでは、最後のグループの空ラベルが省略される。
-    if not width - n + 1 <= len(groups) <= width or groups + [""] * (width - len(groups)) != expected:
-        raise InputError(f"SDC『{title}』の勾配・支持力見出しが不正です")
-    if split(index + 2) != [f"{i}列目" for i in range(1, n + 1)] * len(labels):
-        raise InputError(f"SDC『{title}』は1列目から順に並ぶN列目形式が必要です")
+    header = split(index + 2)
     fields = split(index + 3)
+    size = 2 if header[:2] == list(sdc_columns.PARITY) else n
+    layout = sdc_columns.resolve(header[:size], n, ordered=True, context=f"SDC {index+3}行『{title}』")
+    width = len(labels) * size
+    omitted = (allow_omitted and layout.kind == "parity" and
+               groups == ["長期", "", "短期"] and header == list(sdc_columns.PARITY)*2 and
+               len(fields) == 6)
+    interpretation = "tip-parity-omitted-gradient-heading" if omitted else layout.kind
+    expected = [label if j == 0 else "" for label in labels for j in range(size)]
+    # 上段の結合見出しでは、最後のグループの空ラベルが省略される。
+    if not omitted and (not width - size + 1 <= len(groups) <= width or groups + [""] * (width - len(groups)) != expected):
+        raise InputError(f"SDC『{title}』の勾配・支持力見出しが不正です")
+    if not omitted and header != list(layout.labels) * len(labels):
+        raise InputError(f"SDC『{title}』の各勾配・支持力で杭列見出しが一致しません")
     if len(fields) != width:
         raise InputError(f"SDC {index + 4}行: データ列数が見出しと一致しません")
     if index + 4 < end and lines[index + 4] and not lines[index + 4].startswith("※"):
         raise InputError(f"SDC『{title}』の値は1行で指定してください")
-    return [support.num(v, f"SDC {index + 4}行") for v in fields], index + 4
+    raw_values = [support.num(v, f"SDC {index + 4}行") for v in fields]
+    sources = [layout.sources(i*size, " "+label, interpretation) for i, label in enumerate(labels)]
+    refs = {col: tuple(group[col] for group in sources) for col in layout.indices}
+    values = {col: tuple(raw_values[ref.field-1] for ref in entries) for col, entries in refs.items()}
+    return TipTable(values, refs, index+4, layout, interpretation)
 
 
 def parse_sdc(raw: bytes) -> Profile:
@@ -79,19 +102,22 @@ def parse_sdc(raw: bytes) -> Profile:
     arrangement = [v.strip() for v in lines[header + 2].split(",")]
     if len(arrangement) != 4:
         raise InputError("SDCの杭配置条件が不正です")
-    n = base.integer(arrangement[0], "杭列数")
+    n = sdc_columns.pile_count(lines, direction+1, end)
     vertical_titles = [s for s in ("杭先端の鉛直鉛直ばね値(kN/m)", "杭先端の鉛直ばね値(kN/m)")
                        if s in lines[spring + 1:force]]
     if len(vertical_titles) != 1:
         raise InputError("SDCの杭先端鉛直ばね(kN/m)の見出しが1個必要です")
-    k, kl = read_tip_table(lines, vertical_titles[0], ["長期", "短期(第1勾配)", "短期(第2勾配)"],
-                           n, spring + 1, force)
+    k = read_tip_table(lines, vertical_titles[0], ["長期", "短期(第1勾配)", "短期(第2勾配)"],
+                       n, spring + 1, force, allow_omitted="Ver.5.2.3" in lines[:3])
     for title in ("杭先端の水平ばね値(kN/m)", "杭先端の回転ばね値(kN/m)"):
-        other, _ = read_tip_table(lines, title, ["長期", "短期"], n, spring + 1, force)
-        if any(other):
+        other = read_tip_table(lines, title, ["長期", "短期"], n, spring + 1, force)
+        # 未使用の偶数区分も含め、表全体がゼロであることを確認する。
+        if any(support.num(v, f"SDC {other.line}行") for v in lines[other.line-1].split(",")):
             raise InputError("水平・回転の先端ばねが非ゼロのSDCには対応していません")
-    f, fl = read_tip_table(lines, "地震時：杭先端の鉛直地盤支持力(kN)",
-                           ["押し込み側(降伏点)", "押し込み側(終局点)"], n, force + 1, force_end)
+    f = read_tip_table(lines, "地震時：杭先端の鉛直地盤支持力(kN)",
+                       ["押し込み側(降伏点)", "押し込み側(終局点)"], n, force + 1, force_end)
+    if f.layout.kind != k.layout.kind:
+        raise InputError("SDC先端表: 鉛直ばねと支持力の杭列形式が一致しません")
     pile_headers = [i for i, s in enumerate(lines) if s.startswith("杭長,突出長,根入れ深さ,")]
     if len(pile_headers) != 1 or pile_headers[0] + 1 >= len(lines):
         raise InputError("SDCの杭長・突出長が見つかりません")
@@ -101,13 +127,15 @@ def parse_sdc(raw: bytes) -> Profile:
     length, protrusion = [support.num(v, "杭条件") for v in pile[:2]]
     if length <= 0 or protrusion != 0:
         raise InputError("正の杭長・突出長0のSDCが必要です")
-    values = {}
+    values, sources = {}, {}
     for col in range(1, n + 1):
-        v = TipValues(k[n + col - 1], k[2 * n + col - 1], f[col - 1], f[n + col - 1])
+        v = TipValues(k.values[col][1], k.values[col][2], *f.values[col])
         if min(v.k1, v.k2, v.fy, v.fu) <= 0 or v.fu < v.fy:
             raise InputError(f"SDC {col}列目: 正のばね値・支持力、終局点≧降伏点が必要です")
         values[col] = v
-    return Profile(length, values, kl, fl)
+        sources[col] = dict(zip(("k1_kN_per_m", "k2_kN_per_m", "fy_kN", "fu_kN"),
+                                (*k.sources[col][1:], *f.sources[col])))
+    return Profile(length, values, k.line, f.line, sources, k.interpretation)
 
 
 def make_plan(ndu: base.Ndu, profile: Profile, groups: dict[int, int]):

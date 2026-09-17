@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
 import excel_report as report
+from excel_test_helpers import sheet_xml, source_cell, print_names
 from excel_preview import ExcelPreview
 
 
@@ -111,7 +112,7 @@ class PressureReportTests(unittest.TestCase):
     def test_saved_merges_values_styles_and_printing(self):
         ns = {'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
         with zipfile.ZipFile(BytesIO(self.plan.workbook.to_xlsx())) as z:
-            root = ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
+            root = sheet_xml(z,'有効抵抗土圧')
             self.assertEqual(root.find('m:dimension',ns).get('ref'),'A1:AA64')
             merges = {e.get('ref') for e in root.findall('m:mergeCells/m:mergeCell',ns)}
             self.assertTrue({'D3:D4','D5:D8','H21:H26','E21:E22','V2:W2'}<=merges)
@@ -119,23 +120,22 @@ class PressureReportTests(unittest.TestCase):
             self.assertEqual(root.find('m:pageSetup',ns).get('orientation'),'portrait')
             self.assertEqual(root.find('m:pageSetup',ns).get('pageOrder','downThenOver'),'downThenOver')
             cells = {e.get('r'):e for e in root.findall('m:sheetData/m:row/m:c',ns)}
-            self.assertIsNotNone(cells['D3'].find('m:f',ns))
+            self.assertIsNone(cells['D3'].find('m:f',ns))
             self.assertEqual(float(cells['D3'].findtext('m:v',namespaces=ns)),1.3)
             self.assertIsNone(cells['D4'].find('m:v',ns))
             styles = ET.fromstring(z.read('xl/styles.xml'))
             xfs = list(styles.find('m:cellXfs',ns))
             self.assertEqual(xfs[int(cells['G3'].get('s'))].find('m:alignment',ns).get('vertical'),'top')
             self.assertEqual(xfs[int(cells['G4'].get('s'))].find('m:alignment',ns).get('vertical','bottom'),'bottom')
-            names = [e.text for e in ET.fromstring(z.read('xl/workbook.xml')).findall('m:definedNames/m:definedName',ns) if e.get('localSheetId')=='1']
+            names = list(print_names(z,'有効抵抗土圧').values())
             self.assertTrue(any('$A$1:$AA$63' in n for n in names))
             self.assertTrue(any('$1:$2' in n for n in names))
 
     def test_source_edit_isolated_by_column_and_endpoint_and_fixed_values(self):
         book = report.build(self.plan.report)
-        source = book.sheet('入力根拠')
-        original_fixed = [(n,r,c,v,t,source.rows[r][c+1].value) for n,r,c,v,t in book.expected]
+        original_fixed = list(book.expected)
         baseline = {(r,c):book.sheet('有効抵抗土圧').rows[r][c].cached for r,c in [(2,8),(3,8),(2,17),(2,26)]}
-        cell = next(row[5] for row in source.rows if len(row)==7 and row[0].value=='有効抵抗土圧' and row[1].value==187 and row[2].value==7)
+        cell = source_cell(book,'pressure',187,7)
         cell.value += 100
         book.recalculate(verify=False)
         sheet = book.sheet('有効抵抗土圧')
@@ -143,7 +143,7 @@ class PressureReportTests(unittest.TestCase):
         self.assertAlmostEqual(sheet.rows[3][8].cached,baseline[3,8]+100*(1-1.3/1.5))
         self.assertEqual(sheet.rows[2][17].cached,baseline[2,17])
         self.assertEqual(sheet.rows[2][26].cached,baseline[2,26])
-        self.assertEqual(original_fixed,[(n,r,c,v,t,source.rows[r][c+1].value) for n,r,c,v,t in book.expected])
+        self.assertEqual(original_fixed,book.expected)
         with self.assertRaisesRegex(app.InputError,'pressure:KG4:98'):book.recalculate()
 
     def test_selected_groups_and_direction_use_total_sdc_columns(self):
@@ -217,17 +217,13 @@ class PressureReportTests(unittest.TestCase):
         sheet.range_merges[1,0]=(1,1)
         with self.assertRaisesRegex(app.InputError,'重複'):book.to_xlsx()
 
-    def test_summary_links_both_operations_and_no_pressure_when_unselected(self):
+    def test_selected_sheets_and_no_pressure_dependencies_when_unselected(self):
         both = app.prepare(replace(self.request,operations=('horizontal','pressure')))
-        summary = both.workbook.sheet('変換結果')
-        row = next(row for row in summary.rows if row and row[0].link==('水平地盤ばね',2,5))
-        self.assertEqual(row[10].link,('有効抵抗土圧',2,7))
-        only = self.plan.workbook.sheet('変換結果')
-        row = next(row for row in only.rows if row and row[0].link==('有効抵抗土圧',2,7))
-        self.assertEqual(len(row),10)
+        self.assertEqual([s.name for s in both.workbook.sheets],['水平地盤ばね','有効抵抗土圧'])
+        self.assertEqual([s.name for s in self.plan.workbook.sheets],['有効抵抗土圧'])
         none = app.prepare(replace(self.request,operations=('horizontal',)))
         self.assertNotIn('有効抵抗土圧',[s.name for s in none.workbook.sheets])
-        self.assertFalse(any('土圧の採用照合'==name for name,r,c in none.workbook.sheet('入力根拠').sections))
+        self.assertFalse(any(check.target.startswith('pressure:') for check in none.workbook.expected))
 
     def test_gui_rectangle_selection_offscreen_anchor_and_right_block(self):
         root = tk.Tk()
@@ -259,15 +255,8 @@ class PressureReportTests(unittest.TestCase):
         labels = [preview.canvas.itemcget(i,'text') for i in preview.canvas.find_all() if preview.canvas.type(i)=='text']
         self.assertIn('154',labels)  # Z21が画面外でもZ21:Z26は可視。
         self.assertIn('AA',labels)
-        preview.sheet_name.set('変換結果')
-        preview.select_sheet()
-        rr = next(r for r,row in enumerate(preview.sheet.rows) if row and row[0].link==('有効抵抗土圧',2,25))
-        preview.scroll_to(rr,0)
-        root.update_idletasks()
-        preview.follow_link(event(rr,0))
-        self.assertEqual(preview.sheet.name,'有効抵抗土圧')
-        self.assertEqual(preview.selected,(2,25))
-        self.assertGreater(preview.canvas.canvasx(0),0)
+        self.assertEqual(tuple(preview.sheet_box['values']),('有効抵抗土圧',))
+        self.assertNotIn('リンク',preview.formula.get())
 
 
 if __name__=='__main__':unittest.main()

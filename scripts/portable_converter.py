@@ -20,7 +20,7 @@ import calculation_record
 import excel_report
 from kg_candidates import inspect_candidates, validate_groups
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 APP_NAME = "SDCConverter"
 InputError = base.InputError
 OPERATIONS = {
@@ -38,6 +38,7 @@ class Request:
     ndu: Path
     operations: tuple[str, ...] = tuple(OPERATIONS)
     groups: tuple[str, ...] = DEFAULT_GROUPS
+    # GUIはdirect（指定SDC列をそのまま使用）。right/leftは既存CLI/API互換用。
     push_direction: str = "right"
     # 周面方式は呼び出し元で明示する。CLIと同じ制約を保つ。
     shaft_profile: str | None = None
@@ -113,8 +114,8 @@ def prepare(request: Request) -> Plan:
         raise InputError("変換する項目を1つ以上選択してください（重複・不明な項目は不可）。")
     if "shaft" in operations and request.shaft_profile != "existing-screen":
         raise InputError("周面ばねは『既存画面方式』を明示してください。")
-    if request.push_direction not in ("right", "left"):
-        raise InputError("土圧の押す方向は right / left を指定してください。")
+    if request.push_direction not in ("right", "left", "direct"):
+        raise InputError("土圧の列指定は direct / right / left を指定してください。")
     if request.horizontal_cross_layer not in ("length-weighted", "midpoint", "skip", "error") or request.pressure_cross_layer not in ("integral-average", "endpoints", "error"):
         raise InputError("境界処理の指定が不正です。")
     if any(type(d) is not int or d not in range(7) for d in (request.pressure_decimals, request.shaft_k_decimals, request.shaft_force_decimals)):

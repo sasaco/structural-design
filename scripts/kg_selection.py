@@ -5,10 +5,10 @@ from pathlib import Path
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import fill_jiban_shogen as base
-from kg_candidates import inspect_candidates, round_length, validate_groups
+from kg_candidates import assign_columns, inspect_candidates, round_length, validate_groups
 
 
 @dataclass
@@ -49,6 +49,16 @@ class KGSelection(ttk.Frame):
         self.canvas.bind("<Configure>", lambda event: self.canvas.itemconfigure(self.window, width=event.width))
         self.canvas.bind("<MouseWheel>", self.wheel)
         ttk.Label(self, textvariable=self.message, wraplength=565, justify="left").pack(fill="x", pady=(4, 0))
+        actions = ttk.Frame(self)
+        actions.pack(fill="x", pady=(8, 0))
+        ttk.Label(actions, text="SDCモデル列を自動設定").pack(side="left")
+        self.direction_buttons = {}
+        for direction, label in (("right", "右押し"), ("left", "左押し")):
+            button = ttk.Button(actions, text=label, command=lambda d=direction: self.assign_columns(d))
+            button.pack(side="left", padx=(8, 0))
+            self.direction_buttons[direction] = button
+        ttk.Label(self, text="選択した杭を左から：右押し …3・3・2・1 ／ 左押し 1・2・3・3…",
+                  wraplength=565, justify="left").pack(fill="x", pady=(4, 0))
         self.traces = [(path, path.trace_add("write", self.path_changed)) for path in (ndu_path, sdc_path)]
         self.poll_id = self.after(75, self.poll)
         self.path_changed()
@@ -74,6 +84,7 @@ class KGSelection(ttk.Frame):
         self.catalog = None
         self.groups.set("")
         self.rows.clear()
+        self.set_locked(self.locked)
         for widget in self.list_frame.winfo_children():
             widget.destroy()
         self.canvas.yview_moveto(0)
@@ -149,10 +160,25 @@ class KGSelection(ttk.Frame):
             row.selected.set(False)
         elif row.selected.get():
             used = {other.column.get() for key, other in self.rows.items() if key != group and other.selected.get()}
-            if not row.column.get() or row.column.get() in used:
-                row.column.set(next((str(col) for col in self.catalog.columns if str(col) not in used), ""))
+            if not row.column.get():
+                available = [col for col in self.catalog.columns if col <= 3]
+                row.column.set(next((str(col) for col in available if str(col) not in used),
+                                    str(available[-1]) if available else ""))
         self.sync_groups()
         self.set_locked(self.locked)
+
+    def assign_columns(self, direction):
+        if self.locked or not self.ready:
+            return
+        selected = [group for group, row in self.rows.items() if row.selected.get()]
+        try:
+            groups = assign_columns(self.catalog, selected, direction)
+        except base.InputError as exc:
+            messagebox.showwarning("列を設定できません", str(exc), parent=self)
+            return
+        for group, column in groups.items():
+            self.rows[group].column.set(str(column))
+        self.sync_groups()
 
     def sync_groups(self):
         self.groups.set(" ".join(f"{group}:{row.column.get()}" for group, row in self.rows.items()
@@ -172,6 +198,9 @@ class KGSelection(ttk.Frame):
     def set_locked(self, locked):
         self.locked = locked
         self.reload_button.configure(state="disabled" if locked else "normal")
+        selected = any(row.selected.get() and row.candidate.enabled for row in self.rows.values())
+        for button in self.direction_buttons.values():
+            button.configure(state="normal" if self.ready and selected and not locked else "disabled")
         for row in self.rows.values():
             enabled = self.ready and row.candidate.enabled and not locked
             row.check.configure(state="normal" if enabled else "disabled")

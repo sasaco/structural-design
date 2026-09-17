@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal as D, DecimalException, ROUND_HALF_UP
 import hashlib
 import json
@@ -17,6 +17,7 @@ import re
 import sys
 
 import fill_jiban_shogen as base
+import sdc_columns
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_NDU = ROOT / "test/今町橋りょう4P(C方向･右押し→)_土圧入力済み.ndu"
@@ -36,6 +37,7 @@ class Layer:
     values: dict[int, tuple[D, D]]
     spring_line: int
     force_line: int
+    sources: dict[int, tuple[sdc_columns.SourceColumn, sdc_columns.SourceColumn]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -107,9 +109,14 @@ def parse_sdc(raw: bytes) -> Profile:
     if (len(fh) - 3) % 2 or len(fh) < 5:
         raise InputError("SDC支持力表の列数が不正です")
     n = (len(fh) - 3) // 2
-    cols = [f"{i}列目" for i in range(1, n + 1)]
+    cols = fh[3:3+n]
+    layout = sdc_columns.resolve(cols, sdc_columns.pile_count(lines, direction+1, end),
+                                 ordered=True, context=f"SDC {fside+4}行の周面支持力表")
     if fh != ["", "", ""] + cols * 2 or kh != ["", ""] + cols * 2 + ["⊿l(m)"] + cols * 2:
-        raise InputError("N列目形式の右SDCが必要です（奇数列・偶数列形式は対象外）")
+        raise InputError("SDC周面表: ばね・支持力の杭列見出しが一致しません。")
+    k_sources = layout.sources(3+2*n, " 押込み 短期第1勾配 K1")
+    f_sources = layout.sources(3, " 押込み 降伏点 Fy")
+    sources = {col: (k_sources[col], f_sources[col]) for col in layout.indices}
     if [v for v in split(kside + 2) if v] != ["長期", "短期(使用性・安全性)", "短期(復旧性・地震時-第1勾配)", "短期(復旧性・地震時-第2勾配)"]:
         raise InputError("SDCのばね勾配見出しが不正です")
     if [v for v in split(fside + 2) if v] != ["降伏点(ρgfy考慮)", "終局点(ρgfu考慮)"]:
@@ -131,7 +138,7 @@ def parse_sdc(raw: bytes) -> Profile:
     if beta_header + 2 >= spring:
         raise InputError("1/βの値がありません")
     beta_row = split(beta_header + 2)
-    if len(beta_row) != 4 or count(beta_row[0], "杭列数") != n:
+    if len(beta_row) != 4 or count(beta_row[0], "杭列数") != len(layout.indices):
         raise InputError("杭列数とSDC表の列数が一致しません")
     exclusion = num(beta_row[-1], "1/β")
     if exclusion >= length - embedment:
@@ -147,7 +154,8 @@ def parse_sdc(raw: bytes) -> Profile:
         if k[1] not in (f[1], max(ZERO, min(bottom, length - embedment) - top)):
             raise InputError("ばね表と支持力表の層厚が一致しません")
         layers.append(Layer(int(f[0]), top, bottom, u, v,
-                            {col: (k[2 + 2 * n + col], f[2 + col]) for col in range(1, n + 1)}, kl, fl))
+                            {col: (k[ks.field-1], f[fs.field-1]) for col, (ks, fs) in sources.items()},
+                            kl, fl, sources))
         top = bottom
     if top != length:
         raise InputError("SDCの全層厚合計と杭長が一致しません")

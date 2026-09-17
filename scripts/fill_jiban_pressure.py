@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 import hashlib
 import json
@@ -16,6 +16,7 @@ import re
 import sys
 
 import fill_jiban_shogen as base
+import sdc_columns
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class PressureLayer:
     bottom: Decimal
     values: dict[int, tuple[Decimal, Decimal]]
     source_line: int
+    sources: dict[int, tuple[sdc_columns.SourceColumn, sdc_columns.SourceColumn]] = field(default_factory=dict)
 
     def at(self, column: int, depth: Decimal) -> Decimal:
         if not self.top <= depth <= self.bottom:
@@ -65,17 +67,15 @@ def parse_pressure_sdc(raw: bytes) -> list[PressureLayer]:
         header.append("")
     if len(header) != len(subheader) or len(header) < 4 or len(header) % 2:
         raise base.InputError("土圧表の杭列・上側/下側の列数が一致しません。")
-    columns = {}
     for i in range(2, len(header), 2):
-        match = re.fullmatch(r"([1-9]\d*)列目", header[i])
-        if not match or header[i + 1] or subheader[i:i + 2] != ["上側", "下側"]:
-            raise base.InputError("土圧表は『N列目』ごとの上側・下側の組が必要です。")
-        column = int(match[1])
-        if column in columns:
-            raise base.InputError(f"土圧表の{column}列目が重複しています。")
-        columns[column] = i
-    if sorted(columns) != list(range(1, len(columns) + 1)):
-        raise base.InputError("土圧表の杭列番号は1から連続している必要があります。")
+        if header[i + 1] or subheader[i:i + 2] != ["上側", "下側"]:
+            raise base.InputError("土圧表は杭列ごとの上側・下側の組が必要です。")
+    layout = sdc_columns.resolve(header[2::2], sdc_columns.pile_count(lines, direction+1, end),
+                                 pressure=True, context=f"SDC {case+3}行の土圧表")
+    columns = {col: 2+2*index for col, index in layout.indices.items()}
+    sources = {col: tuple(sdc_columns.SourceColumn(index+offset+1, header[index]+label, layout.kind)
+                         for offset, label in enumerate((" 上側", " 下側")))
+               for col, index in columns.items()}
     depth = base.ZERO
     layers = []
     for i in range(case + 4, section_end):
@@ -91,9 +91,10 @@ def parse_pressure_sdc(raw: bytes) -> list[PressureLayer]:
         values = {column: (base.number(fields[index], f"第{number}層の上側土圧"),
                            base.number(fields[index + 1], f"第{number}層の下側土圧"))
                   for column, index in columns.items()}
-        if any(value < 0 for pair in values.values() for value in pair):
+        raw_values = [base.number(v, f"SDC {i+1}行の土圧") for v in fields[2:]]
+        if any(value < 0 for value in raw_values):
             raise base.InputError(f"第{number}層に負の土圧があります。")
-        layers.append(PressureLayer(number, depth, depth + thickness, values, i + 1))
+        layers.append(PressureLayer(number, depth, depth + thickness, values, i + 1, sources))
         depth += thickness
     if not layers:
         raise base.InputError("土圧表に層データがありません。")
@@ -146,6 +147,8 @@ def render_pressure(ndu: base.Ndu, updates: dict[int, tuple[Decimal, Decimal]]) 
 
 def make_plan(ndu: base.Ndu, layers: list[PressureLayer], groups: dict[int, int], direction: str,
               decimals: int, policy: str, reference: base.Ndu | None = None) -> tuple[dict, dict]:
+    if direction not in ("direct", "right", "left"):
+        raise base.InputError("土圧の列指定は direct / right / left を指定してください。")
     members = base.collect_members(ndu, groups)
     column_count = len(layers[0].values)
     quantum = Decimal(1).scaleb(-decimals)
@@ -154,6 +157,8 @@ def make_plan(ndu: base.Ndu, layers: list[PressureLayer], groups: dict[int, int]
     for member in members:
         if member.column > column_count:
             raise base.InputError(f"モデル列{member.column}がSDCの列数{column_count}を超えています。")
+        # GUIのdirectでは手入力・自動設定したSDC列を再反転しない。
+        # right/leftは既存CLIのモデル列指定との互換用。
         column = column_count + 1 - member.column if direction == "right" else member.column
         pieces = collect_pieces(member, column, layers)
         raw = calculate_pair(member, pieces, policy)
@@ -203,7 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
     parser.add_argument("--ndu", type=Path, default=base.DEFAULT_NDU)
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:モデル列")
-    parser.add_argument("--push-direction", choices=["right", "left"], default="right")
+    parser.add_argument("--push-direction", choices=["right", "left", "direct"], default="right",
+                        help="direct=指定SDC列をそのまま使用。right/left=従来のモデル列指定（既定:right）")
     parser.add_argument("--decimals", type=int, choices=range(7), default=1, help="最終値の小数桁数（既定: 1）")
     parser.add_argument("--cross-layer", choices=["error", "integral-average", "endpoints"], default="integral-average",
                         help="層境界の処理（既定: integral-average、分布の積分平均を上下端に入力）")

@@ -108,6 +108,22 @@ def self_test(args, app_class):
                 assert selector.ready, selector.message.get()
                 for group in (4, 5, 6):
                     selector.rows[group].check.invoke()
+                # 通常ボタンで列を変更し、5杭でもSDC3列目を共用できる。
+                for group in (2, 3):
+                    selector.rows[group].check.invoke()
+                selector.direction_buttons["right"].invoke()
+                assert selector.selection() == ("2:3", "3:3", "4:3", "5:2", "6:1")
+                selector.direction_buttons["left"].invoke()
+                assert selector.selection() == ("2:1", "3:2", "4:3", "5:3", "6:3")
+                for group in (2, 3):
+                    selector.rows[group].check.invoke()
+                selector.direction_buttons["right"].invoke()
+                assert selector.selection() == ("4:3", "5:2", "6:1")
+                assert app.request().push_direction == "direct"
+                expected_plan = converter.prepare(app.request())
+                assert all(row["pressure_column"] == row["column"]
+                           for row in expected_plan.report["details"]["pressure"]["members"])
+                report["checks"].append("direction-buttons-5-piles-shared-column-and-direct-pressure")
                 failures = []
                 app.show_error = lambda exc, trace: failures.append(trace)
                 for write in (False, True):
@@ -118,17 +134,17 @@ def self_test(args, app_class):
                         time.sleep(0.01)
                     assert not app.busy, "GUI worker timed out"
                     assert not failures, failures
-                    assert len(app.excel_preview.book.sheets) == 7
+                    assert len(app.excel_preview.book.sheets) == 5
                     assert "杭周面の支持力" in app.excel_preview.sheet_box["values"]
-                    assert app.excel_preview.sheet.name == "変換結果"
+                    assert app.excel_preview.sheet.name == "水平地盤ばね"
+                    assert not {"変換結果", "入力根拠"} & set(app.excel_preview.sheet_box["values"])
                     assert len(app.excel_preview.canvas.find_all()) > 0
                     assert "入力値" not in app.excel_preview.sheet_box["values"]
                 assert app.last_saved.output.is_file()
                 assert app.last_saved.excel.is_file()
                 assert app.last_saved.excel.read_bytes()[:2] == b"PK"
                 assert str(app.open_excel_button["state"]) == "normal"
-                assert app.last_saved.output.read_bytes() == converter.prepare(
-                    converter.Request(args.sdc, args.ndu, shaft_profile="existing-screen")).data
+                assert app.last_saved.output.read_bytes() == expected_plan.data
                 assert str(app.save_button["state"]) == "normal"
                 report["checks"].append("gui-preview-and-save-worker")
             assert all(path.read_bytes() == original for path, original in originals.items())

@@ -1,4 +1,4 @@
-"""先端2表の原値・固定実入力・別リンク・可変件数・改ページとGUIを検証する。"""
+"""先端2表の原値・内部照合・可変件数・改ページとGUIを検証する。"""
 
 from dataclasses import replace
 from decimal import Decimal as D
@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
 import excel_report as report
+from excel_test_helpers import sheet_xml, source_cell, print_names
 from excel_preview import ExcelPreview
 from test_fill_pile_tip_suppot_info import sdc_bytes
 from test_fill_suppot_info import ndu_bytes
@@ -60,7 +61,7 @@ class TipReportTests(unittest.TestCase):
         cls.plan=app.prepare(cls.request)
 
     def test_reference_cells_sources_and_all_ten_fields(self):
-        book=self.plan.workbook; sheet=book.sheet('杭先端ばね'); source=book.sheet('入力根拠')
+        book=self.plan.workbook; sheet=book.sheet('杭先端ばね')
         self.assertEqual((len(sheet.rows),len(sheet.widths)),(14,3))
         self.assertEqual(sheet.merged_ranges(),{(1,0):(2,0),(1,1):(1,2),(9,0):(10,0),(9,1):(9,2)})
         self.assertEqual([s[0] for s in sheet.sections],['杭先端のばね定数','先端支持力'])
@@ -73,33 +74,32 @@ class TipReportTests(unittest.TestCase):
                 self.assertEqual(sheet.rows[r][0].value,node)
                 for c,v in enumerate(vals,1):
                     self.assertEqual(D(str(book.value(sheet.name,r,c))),D(str(v)))
-                    self.assertEqual(sheet.rows[r][c].formula.op,'ref')
-                    name,rr,cc=sheet.rows[r][c].formula.args
-                    origin=book.sheet(name).rows[rr]
-                    self.assertEqual((origin[0].value,origin[1].value,origin[2].value),
-                                     ('杭先端ばね',275 if r<8 else 293,(3*c+i+1) if r<8 else (3*(c-1)+i+1)))
+                    self.assertIsNone(sheet.rows[r][c].formula)
+                    source_key=('tip',275 if r<8 else 293,(3*c+i+1) if r<8 else (3*(c-1)+i+1))
+                    self.assertEqual(book.sources[source_key],(sheet.name,r,c))
             tokens=raw[f'SuppotInfo{61+i}'.encode()].split(b',')[3:]
             values=[D(t.decode().strip()) if t.strip() else None for t in tokens]
             self.assertEqual(values,list(map(lambda v:D(str(v)) if v is not None else None,[k1,fy,None,k2,fu,None,k2,k1,k2,k2])))
         self.assertEqual(len(book.expected),12)
-        self.assertEqual(len(source.checks),15)
-        self.assertTrue(all(book.value(source.name,r,c)==0 for r,c in source.checks))
+        self.assertEqual(len(book.geometry_checks),3)
+        self.assertTrue(all(D(str(check.value(book)))==D(check.expected) for check in (*book.expected,*book.geometry_checks)))
         self.assertEqual(sheet.rows[3][1].display(),'327072')
         self.assertEqual(sheet.rows[11][1].display(),'7167.5')
 
     def test_four_sources_recalculate_independently_and_fixed_blanks_stay(self):
         for line,field,cell in [(275,4,(3,1)),(275,7,(3,2)),(293,1,(11,1)),(293,4,(11,2))]:
-            book=report.build(self.plan.report);source=book.sheet('入力根拠')
-            before={(s,r,c):book.value(s,r,c) for s,r,c,_,_ in book.expected}
-            fixed=[(s.name,r,c,v.value) for s in book.sheets for r,row in enumerate(s.rows) for c,v in enumerate(row) if v.style=='actual']
-            r=next(r for r,row in enumerate(source.rows) if len(row)==7 and (row[0].value,row[1].value,row[2].value)==('杭先端ばね',line,field))
-            source.rows[r][5].value+=D('0.125')
+            book=report.build(self.plan.report)
+            before={check.expr.args:check.value(book) for check in book.expected}
+            fixed=[check.expected for check in book.expected]
+            record_before=[f['after'] for f in self.plan.report['calculation']['fields']]
+            source_cell(book,'tip',line,field).value+=D('0.125')
             book.recalculate(verify=False)
             for (s,r,c),v in before.items():
                 self.assertEqual(book.value(s,r,c)-v,0.125 if (r,c)==cell else 0)
-            self.assertEqual(sum(book.value(source.name,r,c)!=0 for r,c in source.checks),1)
-            for s,r,c,v in fixed:self.assertEqual(book.sheet(s).rows[r][c].value,v)
-            self.assertTrue(any(v is None for _,_,_,v in fixed))
+            self.assertEqual(sum(D(str(check.value(book)))!=D(check.expected) for check in book.expected),1)
+            self.assertEqual(fixed,[check.expected for check in book.expected])
+            self.assertEqual(record_before,[f['after'] for f in self.plan.report['calculation']['fields']])
+            self.assertEqual(record_before.count(None),6)
             with self.assertRaisesRegex(app.InputError,'tip:KG4:122'):book.recalculate()
 
     def test_selection_order_other_column_and_omission(self):
@@ -107,11 +107,11 @@ class TipReportTests(unittest.TestCase):
             p=app.prepare(replace(self.request,groups=groups));s=p.workbook.sheet('杭先端ばね');n=len(nodes)
             self.assertEqual(len(s.rows),2*n+8)
             self.assertEqual([row[0].value for row in s.rows if isinstance(row[0].value,int)],nodes*2)
-            self.assertEqual([x.name for x in p.workbook.sheets],['変換結果','杭先端ばね','入力根拠'])
+            self.assertEqual([x.name for x in p.workbook.sheets],['杭先端ばね'])
             if groups==('5:1',):self.assertEqual(p.workbook.value(s.name,3,1),327072)
         p=app.prepare(replace(self.request,operations=('shaft',),shaft_profile='existing-screen'))
         self.assertNotIn('杭先端ばね',[s.name for s in p.workbook.sheets])
-        self.assertFalse(any(title.startswith('先端の') for title,_,_ in p.workbook.sheet('入力根拠').sections))
+        self.assertFalse(any(check.target.startswith('tip:') for check in p.workbook.expected))
 
     def test_nonconsecutive_nodes_decimal_precision_and_add_update(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -130,7 +130,7 @@ class TipReportTests(unittest.TestCase):
             self.assertEqual(len(s.rows),16)
             self.assertTrue(all(D(row['pile_length_m'])==D('7.25') for row in p.report['details']['tip']['nodes']))
 
-    def test_pagination_boundary_and_long_tables_preserve_every_node_and_link(self):
+    def test_pagination_boundary_and_long_tables_preserve_every_node_and_adoption(self):
         with tempfile.TemporaryDirectory() as folder:
             for count,pages in [(14,1),(15,2),(35,2),(36,3),(70,4)]:
                 p=app.prepare(synthetic_request(folder,count));book=p.workbook;s=book.sheet('杭先端ばね')
@@ -144,37 +144,34 @@ class TipReportTests(unittest.TestCase):
                     self.assertLessEqual(sum(s.heights[r] for r in range(a,b)),730)
                     for (r,c),(bottom,right) in s.merged_ranges().items():
                         if a<=r<b:self.assertLess(bottom,b)
-                for table,keys in [('杭先端のばね定数',('K1','K2')),('先端支持力',('Fy','Fu'))]:
-                    for row in book.sheet('入力根拠').rows:
-                        if len(row)==12 and row[4].link and row[4].value in keys:
-                            name,r,c=row[4].link
-                            self.assertEqual(s.rows[r][0].value,row[2].value)
-                            self.assertEqual(book.value(name,r,c),float(row[7].value))
+                self.assertEqual(len(book.expected),4*count)
+                for check in book.expected:
+                    name,r,c=check.expr.args
+                    self.assertEqual(s.rows[r][0].value,int(check.target.split(':')[2]))
+                    self.assertEqual(book.value(name,r,c),float(check.expected))
                 book.to_xlsx()
 
-    def test_xlsx_print_merges_blanks_and_distinct_navigation(self):
+    def test_xlsx_print_merges_blanks_and_direct_values(self):
         book=self.plan.workbook;ns={'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
         with zipfile.ZipFile(BytesIO(book.to_xlsx())) as archive:
-            root=ET.fromstring(archive.read('xl/worksheets/sheet2.xml'))
+            root=sheet_xml(archive,'杭先端ばね')
             self.assertEqual(root.find('m:dimension',ns).get('ref'),'A1:C14')
             self.assertEqual(root.find('m:pageSetup',ns).get('orientation'),'portrait')
             self.assertEqual(root.find('m:pageSetup',ns).get('scale','100'),'100')
             self.assertIsNone(root.find('m:rowBreaks',ns));self.assertIsNone(root.find('m:colBreaks',ns))
             self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
             self.assertEqual({x.get('ref') for x in root.findall('m:mergeCells/m:mergeCell',ns)},{'A2:A3','B2:C2','A10:A11','B10:C10'})
-            names=ET.fromstring(archive.read('xl/workbook.xml'))
-            self.assertFalse(any(x.get('name')=='_xlnm.Print_Titles' and x.get('localSheetId')=='1' for x in names.findall('.//m:definedName',ns)))
-            summary=ET.fromstring(archive.read('xl/worksheets/sheet1.xml'))
-            links={x.get('location') for x in summary.findall('m:hyperlinks/m:hyperlink',ns)}
-            self.assertTrue({f"'杭先端ばね'!A{r}" for r in (4,5,6,12,13,14)}<=links)
-            source=book.sheet('入力根拠');xml=ET.fromstring(archive.read('xl/worksheets/sheet3.xml'))
-            for r,row in enumerate(source.rows):
-                for c,v in enumerate(row):
-                    if v.style=='actual' and v.value is None:
-                        cell=xml.find(f'.//m:c[@r="{report.address(r,c)}"]',ns)
-                        self.assertTrue(cell is None or (cell.find('m:v',ns) is None and cell.find('m:f',ns) is None))
+            self.assertNotIn('_xlnm.Print_Titles',print_names(archive,'杭先端ばね'))
+            self.assertFalse(root.findall('.//m:f',ns))
+            self.assertFalse(root.findall('m:hyperlinks/m:hyperlink',ns))
+            cells={cell.get('r'):cell for cell in root.findall('.//m:sheetData/m:row/m:c',ns)}
+            for r in (4,5,6,12,13,14):
+                for c in ('B','C'):self.assertIsNotNone(cells[f'{c}{r}'].find('m:v',ns))
+            for address in ('A3','A7','B7','C7','A8','B8','C8','A11'):
+                cell=cells.get(address)
+                self.assertTrue(cell is None or (cell.find('m:v',ns) is None and cell.find('m:f',ns) is None))
 
-    def test_gui_merge_selection_formula_bar_titles_and_force_link(self):
+    def test_gui_merge_selection_values_titles_and_force_section(self):
         root=tk.Tk();root.withdraw();root.geometry('1000x850');self.addCleanup(root.destroy)
         preview=ExcelPreview(root);preview.pack(fill='both',expand=True);preview.show(self.plan.workbook)
         root.attributes('-alpha',0);root.deiconify();root.update()
@@ -184,16 +181,16 @@ class TipReportTests(unittest.TestCase):
                                    y=(preview.ys[r]+preview.ys[r+1])/2-preview.canvas.canvasy(0))
         preview.select_cell(event(2,0));self.assertEqual(preview.cell_name.get(),'A2')
         preview.select_cell(event(1,2));self.assertEqual(preview.cell_name.get(),'B2')
-        preview.select_cell(event(3,1));self.assertIn("'入力根拠'!",preview.formula.get())
+        preview.select_cell(event(3,1));self.assertFalse(preview.formula.get().startswith('='))
         self.assertIn('327072',preview.formula.get())
         titles=[preview.canvas.itemcget(i,'text') for i in preview.canvas.find_all() if preview.canvas.type(i)=='text']
         self.assertIn('杭先端のばね定数',titles);self.assertIn('先端支持力',titles)
         preview.section_name.set('先端支持力');preview.go_section();root.update()
         self.assertEqual(preview.sheet.sections[1],('先端支持力',8,0))
-        preview.sheet_name.set('変換結果');preview.select_sheet()
-        r=next(r for r,row in enumerate(preview.sheet.rows) if row and row[0].link==('杭先端ばね',11,0))
-        preview.scroll_to(r,0);root.update_idletasks();preview.follow_link(event(r,0))
-        self.assertEqual(preview.selected,(11,0));self.assertEqual(preview.sheet.name,'杭先端ばね')
+        self.assertEqual(tuple(preview.sheet_box['values']),('杭先端ばね',))
+        preview.select_cell(event(11,1))
+        self.assertEqual(preview.selected,(11,1))
+        self.assertEqual(preview.formula.get(),'7167.5')
 
 
 if __name__=='__main__':unittest.main()

@@ -88,7 +88,7 @@ class ExcelPreview(ttk.Frame):
         self.selected=None
         self.section_box.configure(values=[name for name,_,_ in self.sheet.sections])
         self.section_name.set(self.sheet.sections[0][0] if self.sheet.sections else "")
-        self.formula.set("セルを選択すると数式・値を表示します。青いリンクをダブルクリックすると計算明細へ移動します。")
+        self.formula.set("セルを選択すると数式・値を表示します。表示位置から各杭列・表へ移動できます。")
         self.cell_name.set("セル")
         self.layout()
         self.canvas.xview_moveto(0)
@@ -177,7 +177,6 @@ class ExcelPreview(ttk.Frame):
                     fill="#243B53" if cell.style=="header" else "#FFF2C6" if cell.style=="actual" else "#F8FAFC" if r%2 else "white"
                     color="white" if cell.style=="header" else "#175CAD" if cell.style in ("source","link") else "#202B3C"
                     if cell.style.startswith(("spring","pressure","shaft","tip")):fill,color="white","#202B3C"
-                    if (r,c) in self.sheet.checks and cell.cached != 0:fill,color="#FDE5E5","#B42318"
                     cv.create_rectangle(left,y1,right,cell_bottom,fill=fill,outline="#E3E8EF" if cell.borders is None else "")
                     if cell.borders:
                         edges={"L":(left,y1,left,cell_bottom),"R":(right,y1,right,cell_bottom),"T":(left,y1,right,y1),"B":(left,cell_bottom,right,cell_bottom)}

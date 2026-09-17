@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
 import excel_report as report
+from excel_test_helpers import sheet_xml, source_cell
 from excel_preview import ExcelPreview
 
 
@@ -72,7 +73,7 @@ class ShaftReportTests(unittest.TestCase):
 
     def test_reference_layout_all_nodes_and_independent_integrals(self):
         book=self.plan.workbook
-        self.assertEqual([s.name for s in book.sheets],['変換結果','杭周面ばね','杭周面の支持力','入力根拠'])
+        self.assertEqual([s.name for s in book.sheets],['杭周面ばね','杭周面の支持力'])
         targets={row['node']:row for row in self.plan.report['details']['shaft']['nodes']}
         for name,key,unit in [('杭周面ばね','k1_kN_per_m2','kN/m²'),('杭周面の支持力','fy_kN_per_m','kN/m')]:
             sheet=book.sheet(name)
@@ -100,13 +101,14 @@ class ShaftReportTests(unittest.TestCase):
                     self.assertAlmostEqual(book.value(name,r,c+6),float(exact),places=8)
                     self.assertNotIn('ROUND',sheet.rows[r][c+6].formula.text(name))
                     end=starts[ix+1] if ix+1<len(starts) else 35
-                    parts=[book.value(name,j,c+4) for j in range(r,end) if sheet.rows[j][c+4].formula]
+                    parts=[book.value(name,j,c+4) for j in range(r,end) if sheet.rows[j][c+4].value is not None or sheet.rows[j][c+4].formula]
                     if parts:self.assertAlmostEqual(sum(parts),book.value(name,r,c+3),places=10)
             self.assertEqual(len(set(found)),75)
         self.assertEqual(book.sheet('杭周面ばね').rows[8][6].formula.text('杭周面ばね'),'SUM((C7*E9),(C10*E10),(C11*E11))')
         self.assertEqual(book.sheet('杭周面の支持力').rows[11][6].display(),'1835.0')
         self.assertEqual(len(book.expected),120)
-        for name,r,c,_expected,_target in book.expected:self.assertEqual(book.value(name,r,c+2),0)
+        self.assertEqual(len(book.geometry_checks),150)
+        for check in (*book.expected,*book.geometry_checks):self.assertEqual(D(str(check.value(book))),D(check.expected))
 
     def test_complete_layers_and_source_provenance(self):
         record=self.plan.report['calculation']
@@ -125,16 +127,14 @@ class ShaftReportTests(unittest.TestCase):
         for line,field,name,other,delta in [(214,10,'杭周面ばね','杭周面の支持力',75.5),(246,4,'杭周面の支持力','杭周面ばね',75.5)]:
             book=report.build(self.plan.report)
             before={(s,r,c):book.value(s,r,c) for s in (name,other) for r in (8,12,32) for c in (6,13,20)}
-            fixed=[(s.name,r,c,cell.value) for s in book.sheets for r,row in enumerate(s.rows) for c,cell in enumerate(row) if cell.style=='actual']
-            source=book.sheet('入力根拠')
-            r=next(r for r,row in enumerate(source.rows) if len(row)==7 and row[0].value=='杭周面ばね' and row[1].value==line and row[2].value==field)
-            source.rows[r][5].value+=100
+            fixed=list(book.expected)
+            source_cell(book,'shaft',line,field).value+=100
             book.recalculate(verify=False)
             self.assertAlmostEqual(book.value(name,8,6)-before[name,8,6],delta,places=8)
             for s,r,c in before:
                 if (s,r,c)==(name,8,6):continue
                 self.assertEqual(book.value(s,r,c),before[s,r,c])
-            for s,r,c,v in fixed:self.assertEqual(book.sheet(s).rows[r][c].value,v)
+            self.assertEqual(book.expected,fixed)
             with self.assertRaisesRegex(app.InputError,'shaft:KG4:102'):book.recalculate()
 
     def test_selection_order_and_shaft_omission(self):
@@ -157,8 +157,7 @@ class ShaftReportTests(unittest.TestCase):
                 total=next(r for r,row in enumerate(sheet.rows) if row[c].value=='Σ')
                 self.assertEqual(plan.workbook.value(name,total,c+1),4)
                 self.assertEqual(plan.workbook.value(name,total,c+3),4)
-        source=plan.workbook.sheet('入力根拠')
-        self.assertTrue(all(plan.workbook.value(source.name,r,c)==0 for r,c in source.checks))
+        self.assertTrue(all(D(str(check.value(plan.workbook)))==D(check.expected) for check in plan.workbook.geometry_checks))
         for row in plan.report['details']['shaft']['nodes']:
             for kind,key in [('k','k1_kN_per_m2'),('f','fy_kN_per_m')]:
                 exact=sum((F(str(p[key]))*F(str(p['length_m'])) for p in row['pieces']),F(0))
@@ -175,7 +174,7 @@ class ShaftReportTests(unittest.TestCase):
                 r=next(r for r,row in enumerate(sheet.rows) if row[5].value==10003)
                 self.assertEqual(D(str(plan.workbook.value(name,r,6))),D(value))
                 self.assertEqual(sheet.rows[r][6].display(),format(D(value).quantize(D(1).scaleb(-digits),rounding=ROUND_HALF_UP),f'.{digits}f'))
-                raw=next(cell for row in sheet.rows for cell in row[2:3] if cell.formula and plan.workbook.value(*cell.formula.args)==float(value))
+                raw=next(cell for row in sheet.rows for cell in row[2:3] if cell.value==D(value))
                 self.assertIn(value,raw.display())
             plan.workbook.to_xlsx()
 
@@ -197,20 +196,18 @@ class ShaftReportTests(unittest.TestCase):
                             self.assertIn('続き',str(sheet.rows[r][5].value))
             plan.workbook.to_xlsx()
 
-    def test_xlsx_layout_print_settings_and_separate_links(self):
+    def test_xlsx_layout_print_settings_and_local_formulas(self):
         ns={'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
         with zipfile.ZipFile(BytesIO(self.plan.workbook.to_xlsx())) as archive:
-            for i in (2,3):
-                root=ET.fromstring(archive.read(f'xl/worksheets/sheet{i}.xml'))
+            for name in ('杭周面ばね','杭周面の支持力'):
+                root=sheet_xml(archive,name)
                 self.assertEqual(root.find('m:dimension',ns).get('ref'),'A1:U37')
                 self.assertEqual(root.find('m:pageSetup',ns).get('orientation'),'portrait')
                 self.assertEqual(root.find('m:pageSetup',ns).get('scale','100'),'92')
                 self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[7,14])
                 self.assertEqual({e.get('ref') for e in root.findall('m:mergeCells/m:mergeCell',ns)},{'D2:E2','K2:L2','R2:S2'})
-            summary=ET.fromstring(archive.read('xl/worksheets/sheet1.xml'))
-            links=[h.get('location') for h in summary.findall('m:hyperlinks/m:hyperlink',ns)]
-            self.assertEqual(sum("'杭周面ばね'" in x for x in links),60)
-            self.assertEqual(sum("'杭周面の支持力'" in x for x in links),60)
+                self.assertFalse(root.findall('m:hyperlinks/m:hyperlink',ns))
+                self.assertTrue(all('!' not in f.text for f in root.findall('.//m:f',ns)))
 
     def test_gui_both_sheets_merge_selection_and_force_navigation(self):
         root=tk.Tk();root.withdraw();root.geometry('1200x800');self.addCleanup(root.destroy)
@@ -225,12 +222,8 @@ class ShaftReportTests(unittest.TestCase):
                                                     y=(preview.ys[r]+preview.ys[r+1])/2-preview.canvas.canvasy(0)))
             select(1,18);self.assertEqual(preview.cell_name.get(),'R2')
             select(8,20);self.assertEqual(preview.cell_name.get(),'U9');self.assertIn('Q7',preview.formula.get())
-        preview.sheet_name.set('変換結果');preview.select_sheet()
-        rr=next(r for r,row in enumerate(preview.sheet.rows) if row and row[0].link==('杭周面の支持力',8,19))
-        preview.scroll_to(rr,0);root.update_idletasks()
-        preview.follow_link(SimpleNamespace(x=preview.xs[0]+15,y=(preview.ys[rr]+preview.ys[rr+1])/2-preview.canvas.canvasy(0)))
+        self.assertEqual(tuple(preview.sheet_box['values']),('杭周面ばね','杭周面の支持力'))
         self.assertEqual(preview.sheet.name,'杭周面の支持力')
-        self.assertEqual(preview.selected,(8,19))
 
 
 if __name__=='__main__':unittest.main()

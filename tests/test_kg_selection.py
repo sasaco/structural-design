@@ -156,14 +156,36 @@ class SelectionTests(unittest.TestCase):
         self.view.rows[2].check.invoke()
         self.assertEqual(self.view.selection(), ("5:2",))
 
-    def test_duplicate_columns_are_rejected_and_no_text_entry_is_used(self):
+    def test_duplicate_columns_are_allowed_and_no_text_entry_is_used(self):
         for group in (2, 5):
             self.view.rows[group].check.invoke()
             self.assertEqual(str(self.view.rows[group].combo["state"]), "readonly")
         self.view.rows[5].column.set("1")
         self.view.rows[5].combo.event_generate("<<ComboboxSelected>>")
-        with self.assertRaisesRegex(base.InputError, "重複"):
-            self.view.selection()
+        self.assertEqual(self.view.selection(), ("2:1", "5:1"))
+
+    def test_direction_buttons_assign_once_and_allow_manual_edits(self):
+        self.assertTrue(all(button.instate(["disabled"]) for button in self.view.direction_buttons.values()))
+        for group in (5, 2):
+            self.view.rows[group].check.invoke()
+        self.view.direction_buttons["right"].invoke()
+        self.assertEqual(self.view.selection(), ("2:2", "5:1"))
+        self.view.rows[2].column.set("1")
+        self.view.rows[2].combo.event_generate("<<ComboboxSelected>>")
+        self.assertEqual(self.view.selection(), ("2:1", "5:1"))
+        # チェック解除・再選択で方向による再設定や共有列の置換をしない。
+        self.view.rows[2].check.invoke()
+        self.view.rows[2].check.invoke()
+        self.assertEqual(self.view.selection(), ("2:1", "5:1"))
+        self.view.direction_buttons["left"].invoke()
+        self.assertEqual(self.view.selection(), ("2:1", "5:2"))
+        self.view.set_locked(True)
+        self.view.direction_buttons["right"].invoke()
+        self.assertEqual(self.view.selection(), ("2:1", "5:2"))
+        self.assertTrue(all(button.instate(["disabled"]) for button in self.view.direction_buttons.values()))
+        self.view.set_locked(False)
+        self.ndu_path.set("")
+        self.assertTrue(all(button.instate(["disabled"]) for button in self.view.direction_buttons.values()))
 
     def test_unlock_does_not_reenable_invalid_candidates(self):
         self.view.rows[2].check.invoke()

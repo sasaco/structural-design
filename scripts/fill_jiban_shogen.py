@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import os
 from pathlib import Path
@@ -14,15 +14,14 @@ import re
 import sys
 import tempfile
 
+import sdc_columns as columns
+from sdc_columns import InputError
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SDC = ROOT / "test/今町橋りょう4P(右).sdc"
 DEFAULT_NDU = ROOT / "test/今町橋りょう4P(C方向･右押し→).ndu"
 ZERO = Decimal(0)
-
-
-class InputError(ValueError):
-    """入力ファイルの不足・不整合。書き込み前に報告する。"""
 
 
 @dataclass(frozen=True)
@@ -32,6 +31,7 @@ class Layer:
     bottom: Decimal
     values: dict[int, Decimal]
     source_line: int
+    sources: dict[int, columns.SourceColumn] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -99,16 +99,14 @@ def parse_sdc(raw: bytes) -> list[Layer]:
     if table + 2 >= end or not lines[table + 1].startswith("層番,層厚(m),"):
         raise InputError("水平地盤ばね表の層番・層厚(m)の見出しを確認してください。")
     header = [field.strip() for field in lines[table + 2].split(",")]
-    columns: dict[int, int] = {}
-    for index, field in enumerate(header):
-        match = re.fullmatch(r"短期\(非線形\)-(\d+)列目", field)
-        if match:
-            column = int(match[1])
-            if column in columns:
-                raise InputError(f"短期(非線形)-{column}列目が重複しています。")
-            columns[column] = index
-    if not columns:
-        raise InputError("『短期(非線形)-N列目』の列がありません。右基礎のSDCを指定してください。")
+    prefix = "短期(非線形)-"
+    positions = [i for i, label in enumerate(header) if label.startswith(prefix)]
+    layout = columns.resolve([header[i][len(prefix):] for i in positions],
+                             columns.pile_count(lines, section+1, end),
+                             context=f"SDC {table+3}行の水平ばね表")
+    indices = {col: positions[index] for col, index in layout.indices.items()}
+    sources = {col: columns.SourceColumn(index+1, header[index], layout.kind)
+               for col, index in indices.items()}
     layers: list[Layer] = []
     depth = ZERO
     for i in range(table + 3, end):
@@ -124,10 +122,11 @@ def parse_sdc(raw: bytes) -> list[Layer]:
         if thickness <= 0:
             raise InputError(f"第{layer_number}層の層厚は正の値が必要です。")
         values = {column: number(fields[index], f"第{layer_number}層・{column}列目")
-                  for column, index in columns.items()}
-        if any(value < 0 for value in values.values()):
+                  for column, index in indices.items()}
+        raw_values = [number(fields[index], f"第{layer_number}層・{header[index]}") for index in positions]
+        if any(value < 0 for value in raw_values):
             raise InputError(f"第{layer_number}層: 負のばね値があります。")
-        layers.append(Layer(layer_number, depth, depth + thickness, values, i + 1))
+        layers.append(Layer(layer_number, depth, depth + thickness, values, i + 1, sources))
         depth += thickness
     if not layers:
         raise InputError("水平地盤ばね表に層データがありません。")
@@ -152,7 +151,6 @@ def collect_members(ndu: Ndu, groups: dict[int, int]) -> list[Member]:
     """鉛直杭の各グループ上端を深さ0とする。yは下向きに増加する。"""
     members: list[Member] = []
     used: set[int] = set()
-    group_positions: list[tuple[int, Decimal]] = []
     for group, column in groups.items():
         kg = ndu.fields(f"KGInfo{group}", 3)
         start = integer(kg[1], f"KGInfo{group}の開始部材")
@@ -179,7 +177,6 @@ def collect_members(ndu: Ndu, groups: dict[int, int]) -> list[Member]:
             spans.append((top, bottom, member))
         if len(x_positions) != 1:
             raise InputError(f"KGInfo{group}内の杭のx座標が一致しません。")
-        group_positions.append((column, next(iter(x_positions))))
         spans.sort()
         origin = spans[0][0]
         previous_bottom = origin
@@ -188,9 +185,6 @@ def collect_members(ndu: Ndu, groups: dict[int, int]) -> list[Member]:
                 raise InputError(f"KGInfo{group}: 部材{member}の上端に隙間または重なりがあります。")
             members.append(Member(member, group, column, top - origin, bottom - origin))
             previous_bottom = bottom
-    ordered = sorted(group_positions)
-    if any(right[1] <= left[1] for left, right in zip(ordered, ordered[1:])):
-        raise InputError("杭列は左から右へx座標が増加する順に指定してください。")
     return members
 
 
@@ -260,8 +254,8 @@ def parse_groups(items: list[str]) -> dict[int, int]:
         if not match:
             raise InputError(f"杭グループは KG番号:SDC杭列番号 の形式で指定してください: {item}")
         group, column = map(int, match.groups())
-        if group in groups or column in groups.values():
-            raise InputError("KG番号またはSDC杭列番号が重複しています。")
+        if group in groups:
+            raise InputError("KG番号が重複しています。")
         groups[group] = column
     return groups
 

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
 import excel_report as report
+from excel_test_helpers import sheet_xml, print_names
 from excel_preview import ExcelPreview
 
 
@@ -97,7 +98,7 @@ class HorizontalReportTests(unittest.TestCase):
     def test_saved_merges_printing_styles_and_numeric_cells(self):
         ns = {'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
         with zipfile.ZipFile(BytesIO(self.plan.workbook.to_xlsx())) as z:
-            root = ET.fromstring(z.read('xl/worksheets/sheet2.xml'))
+            root = sheet_xml(z,'水平地盤ばね')
             self.assertEqual(root.find('m:dimension',ns).get('ref'),'A1:U34')
             self.assertEqual({e.get('ref') for e in root.findall('m:mergeCells/m:mergeCell',ns)}, {'D2:E2','K2:L2','R2:S2'})
             self.assertEqual(root.find('m:pageSetup',ns).get('orientation'),'portrait')
@@ -110,7 +111,7 @@ class HorizontalReportTests(unittest.TestCase):
             font = list(styles.find('m:fonts',ns))[int(xf.get('fontId'))]
             self.assertEqual(font.find('m:name',ns).get('val'),'ＭＳ 明朝')
             wb = ET.fromstring(z.read('xl/workbook.xml'))
-            names = {e.get('name'):e.text for e in wb.findall('m:definedNames/m:definedName',ns) if e.get('localSheetId')=='1'}
+            names = print_names(z,'水平地盤ばね')
             self.assertIn('$A$1:$U$34',names['_xlnm.Print_Area'])
             self.assertIn('$1:$2',names['_xlnm.Print_Titles'])
 
@@ -140,8 +141,7 @@ class HorizontalReportTests(unittest.TestCase):
         self.assertEqual(plan.report['details']['horizontal']['members'][0]['value'],'101')
         plan = self.synthetic([[1]],[2],[['100.5']])
         self.assertEqual(plan.report['details']['horizontal']['members'][0]['value'],'100.5')
-        name,r,c,value,_ = plan.workbook.expected[0]
-        self.assertEqual(plan.workbook.value(name,r,c),100.5)
+        self.assertEqual(plan.workbook.expected[0].value(plan.workbook),100.5)
         sheet = plan.workbook.sheet('水平地盤ばね')
         self.assertEqual(plan.workbook.value(sheet.name,3,1),2)  # 層厚と部材長の合計は異なってよい。
         self.assertEqual(plan.workbook.value(sheet.name,3,3),1)
@@ -155,7 +155,7 @@ class HorizontalReportTests(unittest.TestCase):
         for current,expected in [('',None),('0',0),('77.5',77.5)]:
             plan = self.synthetic([[2]],[1,1],policy='skip',current=current)
             sheet = plan.workbook.sheet('水平地盤ばね')
-            self.assertEqual(sheet.rows[2][6].cached,expected)
+            self.assertEqual(sheet.rows[2][6].value,expected)
             self.assertIn('保留',sheet.rows[0][0].value)
             self.assertFalse(plan.workbook.expected)
             plan.workbook.to_xlsx()
@@ -175,7 +175,7 @@ class HorizontalReportTests(unittest.TestCase):
         self.assertEqual(long.workbook.value(sheet.name,2,6),3550)
         long.workbook.to_xlsx()
 
-    def test_gui_scroll_selection_merge_and_links_beyond_column_l(self):
+    def test_gui_scroll_selection_merge_beyond_column_l(self):
         root = tk.Tk()
         root.withdraw()
         root.geometry('1200x800')
@@ -204,15 +204,8 @@ class HorizontalReportTests(unittest.TestCase):
         select(3,20)
         self.assertEqual(preview.cell_name.get(),'U4')
         self.assertIn('Q4',preview.formula.get())
-        preview.sheet_name.set('変換結果')
-        preview.select_sheet()
-        rr = next(r for r,row in enumerate(preview.sheet.rows) if row and row[0].link==('水平地盤ばね',2,19))
-        preview.scroll_to(rr,0)
-        root.update_idletasks()
-        event=SimpleNamespace(x=preview.xs[0]+15,y=(preview.ys[rr]+preview.ys[rr+1])/2-preview.canvas.canvasy(0))
-        preview.follow_link(event)
-        self.assertEqual(preview.sheet.name,'水平地盤ばね')
-        self.assertEqual(preview.selected,(2,19))
+        self.assertNotIn('変換結果',preview.sheet_box['values'])
+        self.assertNotIn('入力根拠',preview.sheet_box['values'])
         self.assertGreater(preview.canvas.canvasx(0),0)
 
 
