@@ -1,1 +1,6 @@
 ~$*.xlsx
+.venv*/
+__pycache__/
+*.py[cod]
+/build/
+/dist/

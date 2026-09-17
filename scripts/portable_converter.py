@@ -1,0 +1,287 @@
+"""Portableアプリ用の変換・確認・保存API。GUIや作業フォルダーに依存しない。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import tempfile
+from uuid import uuid4
+
+import fill_jiban_shogen as base
+import fill_jiban_pressure as pressure
+import fill_suppot_info as support
+import fill_pile_tip_suppot_info as tip
+
+VERSION = "1.0.0"
+APP_NAME = "SDCConverter"
+InputError = base.InputError
+OPERATIONS = {
+    "horizontal": "水平地盤ばね",
+    "pressure": "有効抵抗土圧力",
+    "shaft": "杭周面ばね・支持力",
+    "tip": "杭先端ばね・支持力",
+}
+DEFAULT_GROUPS = ("4:1", "5:2", "6:3")
+
+
+@dataclass(frozen=True)
+class Request:
+    sdc: Path
+    ndu: Path
+    ndt: Path | None = None
+    operations: tuple[str, ...] = tuple(OPERATIONS)
+    groups: tuple[str, ...] = DEFAULT_GROUPS
+    push_direction: str = "right"
+    # 周面方式は呼び出し元で明示する。CLIと同じ制約を保つ。
+    shaft_profile: str | None = None
+
+
+@dataclass(frozen=True)
+class PreviewRow:
+    operation: str
+    target: str
+    before: str
+    after: str
+
+
+@dataclass(frozen=True)
+class Plan:
+    target: Path
+    sources: tuple[tuple[Path, bytes], ...]
+    data: bytes
+    rows: tuple[PreviewRow, ...]
+    report: dict
+
+
+@dataclass(frozen=True)
+class Saved:
+    output: Path
+    backup: Path | None
+    report: Path
+
+
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def input_path(path: Path, suffix: str) -> Path:
+    path = Path(path).expanduser().resolve()
+    if path.suffix.lower() != suffix or not path.is_file():
+        raise InputError(f"既存の{suffix}ファイルを選択してください: {path}")
+    return path
+
+
+def support_values(raw: bytes, ndt: bool) -> dict[int, list[str]]:
+    """確認画面用。出力側の現在値を表示し、参照NDUの値と混同しない。"""
+    if ndt:
+        lines = raw.splitlines()
+        a, b = support.card(lines, b"SUPPORT")
+        return {int(line[:10]): [line[i:i + 10].decode("ascii").strip()
+                                 for i in range(15, 115, 10)]
+                for line in lines[a + 2:b] if line.strip() and int(line[10:15]) == 2}
+    _, _, entries = support.ndu_supports(raw)
+    values = {}
+    for _, body in entries.values():
+        fields = [s.strip().decode("ascii") for s in body.split(b",")]
+        if not fields[0] and fields[2] == "2":
+            values[int(fields[1])] = fields[3:]
+    return values
+
+
+def format_support(values: list[str] | None) -> str:
+    if values is None:
+        return "（支点を追加）"
+    return " / ".join(f"{label}={value.strip() or '空欄'}"
+                      for label, value in zip(support.FIELD_NAMES[3:], values))
+
+
+def prepare(request: Request) -> Plan:
+    """既存4モジュールの計算・レンダリング関数を直接使用。ファイルは書かない。"""
+    operations = request.operations
+    if not operations or len(set(operations)) != len(operations) or set(operations) - OPERATIONS.keys():
+        raise InputError("変換する項目を1つ以上選択してください（重複・不明な項目は不可）。")
+    if request.ndt is not None and set(operations) & {"horizontal", "pressure"}:
+        raise InputError("NDT出力は周面・杭先端のみ対応しています。水平地盤ばね・土圧はNDUを選択してください。")
+    if "shaft" in operations and request.shaft_profile != "existing-screen":
+        raise InputError("周面ばねは『既存画面方式』を明示してください。")
+    if request.push_direction not in ("right", "left"):
+        raise InputError("土圧の押す方向は right / left を指定してください。")
+    groups = base.parse_groups(list(request.groups))
+    if not groups:
+        raise InputError("杭グループを KG番号:列番号 の形式で指定してください。")
+    sdc_path, ndu_path = input_path(request.sdc, ".sdc"), input_path(request.ndu, ".ndu")
+    paths = [sdc_path, ndu_path]
+    if request.ndt is not None:
+        paths.append(input_path(request.ndt, ".ndt"))
+    if any(support.same_path(a, b) for i, a in enumerate(paths) for b in paths[i + 1:]):
+        raise InputError("入力ファイル同士が同じ実体を参照しています。")
+    sources = tuple((p, p.read_bytes()) for p in paths)
+    sdc_raw, ndu_raw = sources[0][1], sources[1][1]
+    ndu = base.parse_ndu(ndu_raw)
+    is_ndt = request.ndt is not None
+    result = sources[-1][1]
+    if is_ndt:
+        support.validate_ndt_geometry(result, ndu, groups)
+    rows, details = [], {}
+    # 選択順によらず同じ手順で処理する。保存は全項目が成功した後だけ。
+    for operation in OPERATIONS:
+        if operation not in operations:
+            continue
+        if operation == "horizontal":
+            layers = base.parse_sdc(sdc_raw)
+            updates, evidence = {}, []
+            current = base.parse_ndu(result)
+            for member in base.collect_members(ndu, groups):
+                overlaps = base.find_overlaps(member, layers)
+                value = base.select_value(member, overlaps, "length-weighted")
+                updates[member.number] = value
+                before = current.fields(f"JibanShogenInfo{member.number}", 7)[1]
+                rows.append(PreviewRow(OPERATIONS[operation], f"部材{member.number}",
+                                       before or "空欄", base.format_number(value)))
+                evidence.append({"member": member.number, "group": member.group, "column": member.column,
+                                 "value": str(value), "pieces": [
+                                     {"sdc_line": o.layer.source_line, "length_m": str(o.length),
+                                      "value": str(o.layer.values[member.column])} for o in overlaps]})
+            result = base.render_ndu(current, updates)
+            details[operation] = {"members": evidence, "count": len(updates)}
+        elif operation == "pressure":
+            current = base.parse_ndu(result)
+            updates, evidence = pressure.make_plan(current, pressure.parse_pressure_sdc(sdc_raw), groups,
+                                                   request.push_direction, 1, "integral-average")
+            for row in evidence["members"]:
+                rows.append(PreviewRow(OPERATIONS[operation], f"部材{row['member']}",
+                                       " / ".join(v or "空欄" for v in row["current"]),
+                                       " / ".join(row["calculated"])))
+            result = pressure.render_pressure(current, updates)
+            details[operation] = evidence
+        else:
+            zeros = set()
+            if operation == "shaft":
+                updates, zeros, tips, evidence = support.make_plan(ndu, support.parse_sdc(sdc_raw), groups)
+                details[operation] = {"nodes": evidence, "unchanged_tip_nodes": sorted(tips)}
+            else:
+                updates, evidence = tip.make_plan(ndu, tip.parse_sdc(sdc_raw), groups)
+                details[operation] = {"nodes": evidence}
+            render = support.render_ndt if is_ndt else support.render_ndu
+            rendered, summary = render(result, updates, zeros)
+            previous = support_values(result, is_ndt)
+            for node, values in updates.items():
+                rows.append(PreviewRow(OPERATIONS[operation], f"節点{node}",
+                                       format_support(previous.get(node)), format_support(values)))
+            result = rendered
+            details[operation]["summary"] = summary
+    # 再描画して同一になることを確認（支点数・ケース行・固定幅も再検査）。
+    if is_ndt:
+        support.validate_ndt_geometry(result, ndu, groups)
+        checked, _ = support.render_ndt(result, {}, set())
+    else:
+        base.parse_ndu(result)
+        checked = support.sync_ndu_support_cases(result) if set(operations) & {"shaft", "tip"} else result
+    if checked != result:
+        raise InputError("変換結果の整合性を確認できませんでした。")
+    report = {
+        "application": APP_NAME, "version": VERSION,
+        "configuration": {"operations": list(operations), "groups": groups,
+                          "push_direction": request.push_direction, "shaft_profile": request.shaft_profile,
+                          "horizontal_cross_layer": "length-weighted", "pressure_cross_layer": "integral-average",
+                          "pressure_decimals": 1, "shaft_k_decimals": 0, "shaft_force_decimals": 1},
+        "sources": [{"path": str(p), "sha256": digest(data)} for p, data in sources],
+        "details": details, "output_sha256": digest(result),
+        "preview": [vars(row) for row in rows],
+    }
+    return Plan(paths[-1], sources, result, tuple(rows), report)
+
+
+def verify_sources(plan: Plan) -> None:
+    for path, original in plan.sources:
+        if path.read_bytes() != original:
+            raise InputError(f"確認後に入力ファイルが変更されました。再度確認してください: {path}")
+
+
+def validate_output(plan: Plan, output: Path, overwrite: bool) -> None:
+    if output.suffix.lower() != plan.target.suffix.lower():
+        raise InputError(f"出力先の拡張子は {plan.target.suffix} を指定してください。")
+    if not output.parent.is_dir():
+        raise InputError("出力先のフォルダーがありません。")
+    if overwrite:
+        if output != plan.target:
+            raise InputError("元ファイル更新では、変換対象そのものを出力先に指定してください。")
+    elif any(support.same_path(output, p) for p, _ in plan.sources):
+        raise InputError("別名保存では入力ファイルを出力先にできません。")
+    for path, _ in plan.sources:
+        if path != plan.target and support.same_path(output, path):
+            raise InputError("参照ファイルを上書きできません。")
+    if not overwrite and output.exists():
+        raise InputError(f"出力ファイルが既にあります。別の名前を指定してください: {output}")
+
+
+def publish_new(temp: Path, output: Path) -> None:
+    """Windows renameは既存先を上書きせず、完成したファイルだけを公開する。"""
+    if os.name == "nt":
+        os.rename(temp, output)
+    else:
+        os.link(temp, output)
+        temp.unlink()
+
+
+def stage(output: Path, data: bytes) -> Path:
+    path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output.parent, prefix=".sdc-", suffix=".tmp", delete=False) as stream:
+            path = Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.read_bytes() != data:
+            raise OSError("一時ファイルの保存内容が一致しません。")
+        return path
+    except BaseException:
+        if path is not None:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def save(plan: Plan, output: Path, *, overwrite: bool = False) -> Saved:
+    """全計算終了→一時保存・照合→バックアップ→再確認→一括置換。"""
+    output = Path(output).expanduser().resolve()
+    validate_output(plan, output, overwrite)
+    verify_sources(plan)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f") + "-" + uuid4().hex[:8]
+    backup = output.with_name(output.name + f".{stamp}.bak") if overwrite else None
+    report_path = output.with_name(output.name + f".{stamp}.report.json")
+    report = dict(plan.report, output=str(output), backup=str(backup) if backup else None,
+                  saved_at=datetime.now().astimezone().isoformat())
+    report_data = (json.dumps(report, ensure_ascii=False, indent=2, default=str) + "\n").encode("utf-8")
+    pending = []
+    report_published = False
+    try:
+        staged = stage(output, plan.data)
+        pending.append(staged)
+        staged_report = stage(report_path, report_data)
+        pending.append(staged_report)
+        if backup is not None:
+            original = next(data for path, data in plan.sources if path == plan.target)
+            staged_backup = stage(backup, original)
+            pending.append(staged_backup)
+            publish_new(staged_backup, backup)
+        # 報告書の保存が失敗しても、変換対象はまだ変更していない。
+        publish_new(staged_report, report_path)
+        report_published = True
+        validate_output(plan, output, overwrite)
+        verify_sources(plan)
+        if overwrite:
+            os.replace(staged, output)
+        else:
+            publish_new(staged, output)
+    except BaseException:
+        if report_published:
+            report_path.unlink(missing_ok=True)
+        raise
+    finally:
+        for path in pending:
+            path.unlink(missing_ok=True)
+    return Saved(output, backup, report_path)

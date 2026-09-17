@@ -1,0 +1,13 @@
+Third-party notices copied without changes on 2026-09-17:
+
+OpenSSL-3.5.5-LICENSE.txt
+https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.5/LICENSE.txt
+The bundled libcrypto is OpenSSL 3.5.5 (27 Jan 2026).
+
+Python-3.12-third-party-notices.html
+https://docs.python.org/3.12/license.html
+Python's acknowledgements and license texts for incorporated software,
+including libmpdec, zlib and other standard-library components.
+
+The build also copies the installed Python LICENSE.txt, Tcl/Tk license.terms
+and PyInstaller COPYING.txt to the adjacent licenses directory.
