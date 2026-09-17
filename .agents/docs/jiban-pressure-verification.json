@@ -1,0 +1,3061 @@
+{
+  "summary": {
+    "members": 72,
+    "crossing_members": 15,
+    "reference_matching_pairs": 28,
+    "reference_differing_pairs": 44,
+    "reference_missing_pairs": 0
+  },
+  "members": [
+    {
+      "member": 98,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "0.000",
+      "bottom_m": "1.300",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "0.000",
+          "bottom_m": "1.300",
+          "upper_pressure": "1162.9",
+          "lower_pressure": "1307.46"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "1162.9",
+        "1307.46"
+      ],
+      "calculated": [
+        "1162.9",
+        "1307.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1163",
+        "1307.5"
+      ],
+      "difference": [
+        "-0.1",
+        "0"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 99,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "1.300",
+      "bottom_m": "2.600",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "1.300",
+          "bottom_m": "1.500",
+          "upper_pressure": "1307.46",
+          "lower_pressure": "1329.7"
+        },
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "1.500",
+          "bottom_m": "2.600",
+          "upper_pressure": "2018.1",
+          "lower_pressure": "2203.661538461538461538461538"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "1988.988343195266272189349112",
+        "1988.988343195266272189349112"
+      ],
+      "calculated": [
+        "1989",
+        "1989"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1989",
+        "1989"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 100,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "2.600",
+      "bottom_m": "3.900",
+      "pieces": [
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "2.600",
+          "bottom_m": "2.800",
+          "upper_pressure": "2203.661538461538461538461538",
+          "lower_pressure": "2237.4"
+        },
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "2.800",
+          "bottom_m": "3.900",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "1826.620118343195266272189349",
+        "1826.620118343195266272189349"
+      ],
+      "calculated": [
+        "1826.6",
+        "1826.6"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "907.7",
+        "907.7"
+      ],
+      "difference": [
+        "918.9",
+        "918.9"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 101,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "3.900",
+      "bottom_m": "5.200",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "3.900",
+          "bottom_m": "5.200",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "1755.0",
+        "1755.0"
+      ],
+      "calculated": [
+        "1755",
+        "1755"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "669",
+        "669"
+      ],
+      "difference": [
+        "1086",
+        "1086"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 102,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "5.200",
+      "bottom_m": "6.500",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "5.200",
+          "bottom_m": "5.700",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        },
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "5.700",
+          "bottom_m": "6.500",
+          "upper_pressure": "2349.1",
+          "lower_pressure": "2472.761538461538461538461538"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "2158.649704142011834319526627",
+        "2158.649704142011834319526627"
+      ],
+      "calculated": [
+        "2158.6",
+        "2158.6"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1741",
+        "1741"
+      ],
+      "difference": [
+        "417.6",
+        "417.6"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 103,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "6.500",
+      "bottom_m": "7.800",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "6.500",
+          "bottom_m": "7.800",
+          "upper_pressure": "2472.761538461538461538461538",
+          "lower_pressure": "2673.711538461538461538461538"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2472.761538461538461538461538",
+        "2673.711538461538461538461538"
+      ],
+      "calculated": [
+        "2472.8",
+        "2673.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2472.8",
+        "2673.8"
+      ],
+      "difference": [
+        "0",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 104,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "7.800",
+      "bottom_m": "9.100",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "7.800",
+          "bottom_m": "8.300",
+          "upper_pressure": "2673.711538461538461538461538",
+          "lower_pressure": "2751.0"
+        },
+        {
+          "layer": 5,
+          "sdc_line": 191,
+          "top_m": "8.300",
+          "bottom_m": "8.900",
+          "upper_pressure": "6809.4",
+          "lower_pressure": "6809.4"
+        },
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "8.900",
+          "bottom_m": "9.100",
+          "upper_pressure": "2948.5",
+          "lower_pressure": "2980.794736842105263157894737"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "4642.113352538150109000311429",
+        "4642.113352538150109000311429"
+      ],
+      "calculated": [
+        "4642.1",
+        "4642.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2640.6",
+        "2640.6"
+      ],
+      "difference": [
+        "2001.5",
+        "2001.5"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 105,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "9.100",
+      "bottom_m": "10.400",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "9.100",
+          "bottom_m": "10.400",
+          "upper_pressure": "2980.794736842105263157894737",
+          "lower_pressure": "3190.710526315789473684210526"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2980.794736842105263157894737",
+        "3190.710526315789473684210526"
+      ],
+      "calculated": [
+        "2980.8",
+        "3190.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3142.6",
+        "3142.6"
+      ],
+      "difference": [
+        "-161.8",
+        "48.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 106,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "10.400",
+      "bottom_m": "11.700",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "10.400",
+          "bottom_m": "11.700",
+          "upper_pressure": "3190.710526315789473684210526",
+          "lower_pressure": "3400.626315789473684210526316"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3190.710526315789473684210526",
+        "3400.626315789473684210526316"
+      ],
+      "calculated": [
+        "3190.7",
+        "3400.6"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3190.8",
+        "3400.7"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 107,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "11.700",
+      "bottom_m": "13.000",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "11.700",
+          "bottom_m": "13.000",
+          "upper_pressure": "3400.626315789473684210526316",
+          "lower_pressure": "3610.542105263157894736842105"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3400.626315789473684210526316",
+        "3610.542105263157894736842105"
+      ],
+      "calculated": [
+        "3400.6",
+        "3610.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3400.7",
+        "3610.6"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 108,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "13.000",
+      "bottom_m": "14.300",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "13.000",
+          "bottom_m": "14.300",
+          "upper_pressure": "3610.542105263157894736842105",
+          "lower_pressure": "3820.457894736842105263157895"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3610.542105263157894736842105",
+        "3820.457894736842105263157895"
+      ],
+      "calculated": [
+        "3610.5",
+        "3820.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3610.6",
+        "3820.6"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 109,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "14.300",
+      "bottom_m": "15.600",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "14.300",
+          "bottom_m": "15.600",
+          "upper_pressure": "3820.457894736842105263157895",
+          "lower_pressure": "4030.373684210526315789473684"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3820.457894736842105263157895",
+        "4030.373684210526315789473684"
+      ],
+      "calculated": [
+        "3820.5",
+        "4030.4"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3820.6",
+        "4030.5"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 110,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "15.600",
+      "bottom_m": "16.900",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "15.600",
+          "bottom_m": "16.900",
+          "upper_pressure": "4030.373684210526315789473684",
+          "lower_pressure": "4240.289473684210526315789474"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "4030.373684210526315789473684",
+        "4240.289473684210526315789474"
+      ],
+      "calculated": [
+        "4030.4",
+        "4240.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "4030.5",
+        "4240.4"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 111,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "16.900",
+      "bottom_m": "18.200",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "16.900",
+          "bottom_m": "18.200",
+          "upper_pressure": "4240.289473684210526315789474",
+          "lower_pressure": "4450.205263157894736842105263"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "4240.289473684210526315789474",
+        "4450.205263157894736842105263"
+      ],
+      "calculated": [
+        "4240.3",
+        "4450.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "4240.4",
+        "4450.3"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 112,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "18.200",
+      "bottom_m": "19.500",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "18.200",
+          "bottom_m": "18.400",
+          "upper_pressure": "4450.205263157894736842105263",
+          "lower_pressure": "4482.5"
+        },
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "18.400",
+          "bottom_m": "19.500",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "3300.731174089068825910931174",
+        "3300.731174089068825910931174"
+      ],
+      "calculated": [
+        "3300.7",
+        "3300.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1683.5",
+        "1683.5"
+      ],
+      "difference": [
+        "1617.2",
+        "1617.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 113,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "19.500",
+      "bottom_m": "20.800",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "19.500",
+          "bottom_m": "20.800",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 114,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "20.800",
+      "bottom_m": "22.100",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "20.800",
+          "bottom_m": "22.100",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 115,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "22.100",
+      "bottom_m": "23.400",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "22.100",
+          "bottom_m": "23.400",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 116,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "23.400",
+      "bottom_m": "24.700",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "23.400",
+          "bottom_m": "24.700",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 117,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "24.700",
+      "bottom_m": "26.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "24.700",
+          "bottom_m": "26.000",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 118,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "26.000",
+      "bottom_m": "27.300",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "26.000",
+          "bottom_m": "27.300",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 119,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "27.300",
+      "bottom_m": "28.600",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "27.300",
+          "bottom_m": "28.600",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 120,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "28.600",
+      "bottom_m": "29.900",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "28.600",
+          "bottom_m": "29.900",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 121,
+      "group": 4,
+      "model_column": 1,
+      "pressure_column": 3,
+      "top_m": "29.900",
+      "bottom_m": "31.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "29.900",
+          "bottom_m": "31.000",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 123,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "0.000",
+      "bottom_m": "1.300",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "0.000",
+          "bottom_m": "1.300",
+          "upper_pressure": "1005.1",
+          "lower_pressure": "1130.073333333333333333333333"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "1005.1",
+        "1130.073333333333333333333333"
+      ],
+      "calculated": [
+        "1005.1",
+        "1130.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1004.8",
+        "1129.6"
+      ],
+      "difference": [
+        "0.3",
+        "0.5"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 124,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "1.300",
+      "bottom_m": "2.600",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "1.300",
+          "bottom_m": "1.500",
+          "upper_pressure": "1130.073333333333333333333333",
+          "lower_pressure": "1149.3"
+        },
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "1.500",
+          "bottom_m": "2.600",
+          "upper_pressure": "1744.2",
+          "lower_pressure": "1904.630769230769230769230769"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "1719.072504930966469428007888",
+        "1719.072504930966469428007888"
+      ],
+      "calculated": [
+        "1719.1",
+        "1719.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1718.4",
+        "1718.4"
+      ],
+      "difference": [
+        "0.7",
+        "0.7"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 125,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "2.600",
+      "bottom_m": "3.900",
+      "pieces": [
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "2.600",
+          "bottom_m": "2.800",
+          "upper_pressure": "1904.630769230769230769230769",
+          "lower_pressure": "1933.8"
+        },
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "2.800",
+          "bottom_m": "3.900",
+          "upper_pressure": "1170.0",
+          "lower_pressure": "1170.0"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "1285.263905325443786982248521",
+        "1285.263905325443786982248521"
+      ],
+      "calculated": [
+        "1285.3",
+        "1285.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "784.2",
+        "784.2"
+      ],
+      "difference": [
+        "501.1",
+        "501.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 126,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "3.900",
+      "bottom_m": "5.200",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "3.900",
+          "bottom_m": "5.200",
+          "upper_pressure": "1170.0",
+          "lower_pressure": "1170.0"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "1170.0",
+        "1170.0"
+      ],
+      "calculated": [
+        "1170",
+        "1170"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "578",
+        "578"
+      ],
+      "difference": [
+        "592",
+        "592"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 127,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "5.200",
+      "bottom_m": "6.500",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "5.200",
+          "bottom_m": "5.700",
+          "upper_pressure": "1170.0",
+          "lower_pressure": "1170.0"
+        },
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "5.700",
+          "bottom_m": "6.500",
+          "upper_pressure": "2030.3",
+          "lower_pressure": "2137.192307692307692307692308"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "1732.30532544378698224852071",
+        "1732.30532544378698224852071"
+      ],
+      "calculated": [
+        "1732.3",
+        "1732.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1504.1",
+        "1504.1"
+      ],
+      "difference": [
+        "228.2",
+        "228.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 128,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "6.500",
+      "bottom_m": "7.800",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "6.500",
+          "bottom_m": "7.800",
+          "upper_pressure": "2137.192307692307692307692308",
+          "lower_pressure": "2310.892307692307692307692308"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2137.192307692307692307692308",
+        "2310.892307692307692307692308"
+      ],
+      "calculated": [
+        "2137.2",
+        "2310.9"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2136.3",
+        "2310"
+      ],
+      "difference": [
+        "0.9",
+        "0.9"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 129,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "7.800",
+      "bottom_m": "9.100",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "7.800",
+          "bottom_m": "8.300",
+          "upper_pressure": "2310.892307692307692307692308",
+          "lower_pressure": "2377.7"
+        },
+        {
+          "layer": 5,
+          "sdc_line": 191,
+          "top_m": "8.300",
+          "bottom_m": "8.900",
+          "upper_pressure": "4539.6",
+          "lower_pressure": "4539.6"
+        },
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "8.900",
+          "bottom_m": "9.100",
+          "upper_pressure": "2548.4",
+          "lower_pressure": "2576.311578947368421052631579"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "3391.060949859856742447835565",
+        "3391.060949859856742447835565"
+      ],
+      "calculated": [
+        "3391.1",
+        "3391.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2281.3",
+        "2281.3"
+      ],
+      "difference": [
+        "1109.8",
+        "1109.8"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 130,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "9.100",
+      "bottom_m": "10.400",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "9.100",
+          "bottom_m": "10.400",
+          "upper_pressure": "2576.311578947368421052631579",
+          "lower_pressure": "2757.736842105263157894736842"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2576.311578947368421052631579",
+        "2757.736842105263157894736842"
+      ],
+      "calculated": [
+        "2576.3",
+        "2757.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2715",
+        "2715"
+      ],
+      "difference": [
+        "-138.7",
+        "42.7"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 131,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "10.400",
+      "bottom_m": "11.700",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "10.400",
+          "bottom_m": "11.700",
+          "upper_pressure": "2757.736842105263157894736842",
+          "lower_pressure": "2939.162105263157894736842105"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2757.736842105263157894736842",
+        "2939.162105263157894736842105"
+      ],
+      "calculated": [
+        "2757.7",
+        "2939.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2756.6",
+        "2938"
+      ],
+      "difference": [
+        "1.1",
+        "1.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 132,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "11.700",
+      "bottom_m": "13.000",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "11.700",
+          "bottom_m": "13.000",
+          "upper_pressure": "2939.162105263157894736842105",
+          "lower_pressure": "3120.587368421052631578947368"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2939.162105263157894736842105",
+        "3120.587368421052631578947368"
+      ],
+      "calculated": [
+        "2939.2",
+        "3120.6"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2938",
+        "3119.4"
+      ],
+      "difference": [
+        "1.2",
+        "1.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 133,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "13.000",
+      "bottom_m": "14.300",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "13.000",
+          "bottom_m": "14.300",
+          "upper_pressure": "3120.587368421052631578947368",
+          "lower_pressure": "3302.012631578947368421052632"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3120.587368421052631578947368",
+        "3302.012631578947368421052632"
+      ],
+      "calculated": [
+        "3120.6",
+        "3302"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3119.4",
+        "3300.7"
+      ],
+      "difference": [
+        "1.2",
+        "1.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 134,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "14.300",
+      "bottom_m": "15.600",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "14.300",
+          "bottom_m": "15.600",
+          "upper_pressure": "3302.012631578947368421052632",
+          "lower_pressure": "3483.437894736842105263157895"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3302.012631578947368421052632",
+        "3483.437894736842105263157895"
+      ],
+      "calculated": [
+        "3302",
+        "3483.4"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3300.7",
+        "3482.1"
+      ],
+      "difference": [
+        "1.3",
+        "1.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 135,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "15.600",
+      "bottom_m": "16.900",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "15.600",
+          "bottom_m": "16.900",
+          "upper_pressure": "3483.437894736842105263157895",
+          "lower_pressure": "3664.863157894736842105263158"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3483.437894736842105263157895",
+        "3664.863157894736842105263158"
+      ],
+      "calculated": [
+        "3483.4",
+        "3664.9"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3482.1",
+        "3663.5"
+      ],
+      "difference": [
+        "1.3",
+        "1.4"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 136,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "16.900",
+      "bottom_m": "18.200",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "16.900",
+          "bottom_m": "18.200",
+          "upper_pressure": "3664.863157894736842105263158",
+          "lower_pressure": "3846.288421052631578947368421"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3664.863157894736842105263158",
+        "3846.288421052631578947368421"
+      ],
+      "calculated": [
+        "3664.9",
+        "3846.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3663.5",
+        "3844.8"
+      ],
+      "difference": [
+        "1.4",
+        "1.5"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 137,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "18.200",
+      "bottom_m": "19.500",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "18.200",
+          "bottom_m": "18.400",
+          "upper_pressure": "3846.288421052631578947368421",
+          "lower_pressure": "3874.2"
+        },
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "18.400",
+          "bottom_m": "19.500",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "2336.283724696356275303643725",
+        "2336.283724696356275303643725"
+      ],
+      "calculated": [
+        "2336.3",
+        "2336.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1454.4",
+        "1454.4"
+      ],
+      "difference": [
+        "881.9",
+        "881.9"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 138,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "19.500",
+      "bottom_m": "20.800",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "19.500",
+          "bottom_m": "20.800",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 139,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "20.800",
+      "bottom_m": "22.100",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "20.800",
+          "bottom_m": "22.100",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 140,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "22.100",
+      "bottom_m": "23.400",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "22.100",
+          "bottom_m": "23.400",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 141,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "23.400",
+      "bottom_m": "24.700",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "23.400",
+          "bottom_m": "24.700",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 142,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "24.700",
+      "bottom_m": "26.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "24.700",
+          "bottom_m": "26.000",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 143,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "26.000",
+      "bottom_m": "27.300",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "26.000",
+          "bottom_m": "27.300",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 144,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "27.300",
+      "bottom_m": "28.600",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "27.300",
+          "bottom_m": "28.600",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 145,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "28.600",
+      "bottom_m": "29.900",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "28.600",
+          "bottom_m": "29.900",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 146,
+      "group": 5,
+      "model_column": 2,
+      "pressure_column": 2,
+      "top_m": "29.900",
+      "bottom_m": "31.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "29.900",
+          "bottom_m": "31.000",
+          "upper_pressure": "2059.2",
+          "lower_pressure": "2059.2"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2059.2",
+        "2059.2"
+      ],
+      "calculated": [
+        "2059.2",
+        "2059.2"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2059.2",
+        "2059.2"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 148,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "0.000",
+      "bottom_m": "1.300",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "0.000",
+          "bottom_m": "1.300",
+          "upper_pressure": "2907.3",
+          "lower_pressure": "3268.7"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "2907.3",
+        "3268.7"
+      ],
+      "calculated": [
+        "2907.3",
+        "3268.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2907.6",
+        "3268.7"
+      ],
+      "difference": [
+        "-0.3",
+        "0"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 149,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "1.300",
+      "bottom_m": "2.600",
+      "pieces": [
+        {
+          "layer": 1,
+          "sdc_line": 187,
+          "top_m": "1.300",
+          "bottom_m": "1.500",
+          "upper_pressure": "3268.7",
+          "lower_pressure": "3324.3"
+        },
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "1.500",
+          "bottom_m": "2.600",
+          "upper_pressure": "5045.2",
+          "lower_pressure": "5509.230769230769230769230769"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "4972.489940828402366863905326",
+        "4972.489940828402366863905326"
+      ],
+      "calculated": [
+        "4972.5",
+        "4972.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "4972.6",
+        "4972.6"
+      ],
+      "difference": [
+        "-0.1",
+        "-0.1"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 150,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "2.600",
+      "bottom_m": "3.900",
+      "pieces": [
+        {
+          "layer": 2,
+          "sdc_line": 188,
+          "top_m": "2.600",
+          "bottom_m": "2.800",
+          "upper_pressure": "5509.230769230769230769230769",
+          "lower_pressure": "5593.6"
+        },
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "2.800",
+          "bottom_m": "3.900",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "2339.063905325443786982248521",
+        "2339.063905325443786982248521"
+      ],
+      "calculated": [
+        "2339.1",
+        "2339.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "2269.3",
+        "2269.3"
+      ],
+      "difference": [
+        "69.8",
+        "69.8"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 151,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "3.900",
+      "bottom_m": "5.200",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "3.900",
+          "bottom_m": "5.200",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "1755.0",
+        "1755.0"
+      ],
+      "calculated": [
+        "1755",
+        "1755"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "1672.5",
+        "1672.5"
+      ],
+      "difference": [
+        "82.5",
+        "82.5"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 152,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "5.200",
+      "bottom_m": "6.500",
+      "pieces": [
+        {
+          "layer": 3,
+          "sdc_line": 189,
+          "top_m": "5.200",
+          "bottom_m": "5.700",
+          "upper_pressure": "1755.0",
+          "lower_pressure": "1755.0"
+        },
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "5.700",
+          "bottom_m": "6.500",
+          "upper_pressure": "5872.6",
+          "lower_pressure": "6181.830769230769230769230769"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "4384.055621301775147928994083",
+        "4384.055621301775147928994083"
+      ],
+      "calculated": [
+        "4384.1",
+        "4384.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "4352.4",
+        "4352.4"
+      ],
+      "difference": [
+        "31.7",
+        "31.7"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 153,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "6.500",
+      "bottom_m": "7.800",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "6.500",
+          "bottom_m": "7.800",
+          "upper_pressure": "6181.830769230769230769230769",
+          "lower_pressure": "6684.330769230769230769230769"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "6181.830769230769230769230769",
+        "6684.330769230769230769230769"
+      ],
+      "calculated": [
+        "6181.8",
+        "6684.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "6182",
+        "6684.5"
+      ],
+      "difference": [
+        "-0.2",
+        "-0.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 154,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "7.800",
+      "bottom_m": "9.100",
+      "pieces": [
+        {
+          "layer": 4,
+          "sdc_line": 190,
+          "top_m": "7.800",
+          "bottom_m": "8.300",
+          "upper_pressure": "6684.330769230769230769230769",
+          "lower_pressure": "6877.6"
+        },
+        {
+          "layer": 5,
+          "sdc_line": 191,
+          "top_m": "8.300",
+          "bottom_m": "8.900",
+          "upper_pressure": "6809.4",
+          "lower_pressure": "6809.4"
+        },
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "8.900",
+          "bottom_m": "9.100",
+          "upper_pressure": "7371.2",
+          "lower_pressure": "7451.936842105263157894736842"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "6891.104905014014325755216443",
+        "6891.104905014014325755216443"
+      ],
+      "calculated": [
+        "6891.1",
+        "6891.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "6601.6",
+        "6601.6"
+      ],
+      "difference": [
+        "289.5",
+        "289.5"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 155,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "9.100",
+      "bottom_m": "10.400",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "9.100",
+          "bottom_m": "10.400",
+          "upper_pressure": "7451.936842105263157894736842",
+          "lower_pressure": "7976.726315789473684210526316"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "7451.936842105263157894736842",
+        "7976.726315789473684210526316"
+      ],
+      "calculated": [
+        "7451.9",
+        "7976.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "7856.4",
+        "7856.4"
+      ],
+      "difference": [
+        "-404.5",
+        "120.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 156,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "10.400",
+      "bottom_m": "11.700",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "10.400",
+          "bottom_m": "11.700",
+          "upper_pressure": "7976.726315789473684210526316",
+          "lower_pressure": "8501.515789473684210526315789"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "7976.726315789473684210526316",
+        "8501.515789473684210526315789"
+      ],
+      "calculated": [
+        "7976.7",
+        "8501.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "7976.9",
+        "8501.7"
+      ],
+      "difference": [
+        "-0.2",
+        "-0.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 157,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "11.700",
+      "bottom_m": "13.000",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "11.700",
+          "bottom_m": "13.000",
+          "upper_pressure": "8501.515789473684210526315789",
+          "lower_pressure": "9026.305263157894736842105263"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "8501.515789473684210526315789",
+        "9026.305263157894736842105263"
+      ],
+      "calculated": [
+        "8501.5",
+        "9026.3"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "8501.7",
+        "9026.5"
+      ],
+      "difference": [
+        "-0.2",
+        "-0.2"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 158,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "13.000",
+      "bottom_m": "14.300",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "13.000",
+          "bottom_m": "14.300",
+          "upper_pressure": "9026.305263157894736842105263",
+          "lower_pressure": "9551.094736842105263157894737"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "9026.305263157894736842105263",
+        "9551.094736842105263157894737"
+      ],
+      "calculated": [
+        "9026.3",
+        "9551.1"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "9026.5",
+        "9551.4"
+      ],
+      "difference": [
+        "-0.2",
+        "-0.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 159,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "14.300",
+      "bottom_m": "15.600",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "14.300",
+          "bottom_m": "15.600",
+          "upper_pressure": "9551.094736842105263157894737",
+          "lower_pressure": "10075.88421052631578947368421"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "9551.094736842105263157894737",
+        "10075.88421052631578947368421"
+      ],
+      "calculated": [
+        "9551.1",
+        "10075.9"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "9551.4",
+        "10076.2"
+      ],
+      "difference": [
+        "-0.3",
+        "-0.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 160,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "15.600",
+      "bottom_m": "16.900",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "15.600",
+          "bottom_m": "16.900",
+          "upper_pressure": "10075.88421052631578947368421",
+          "lower_pressure": "10600.67368421052631578947368"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "10075.88421052631578947368421",
+        "10600.67368421052631578947368"
+      ],
+      "calculated": [
+        "10075.9",
+        "10600.7"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "10076.2",
+        "10601"
+      ],
+      "difference": [
+        "-0.3",
+        "-0.3"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 161,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "16.900",
+      "bottom_m": "18.200",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "16.900",
+          "bottom_m": "18.200",
+          "upper_pressure": "10600.67368421052631578947368",
+          "lower_pressure": "11125.46315789473684210526316"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "10600.67368421052631578947368",
+        "11125.46315789473684210526316"
+      ],
+      "calculated": [
+        "10600.7",
+        "11125.5"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "10601",
+        "11125.9"
+      ],
+      "difference": [
+        "-0.3",
+        "-0.4"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 162,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "18.200",
+      "bottom_m": "19.500",
+      "pieces": [
+        {
+          "layer": 6,
+          "sdc_line": 192,
+          "top_m": "18.200",
+          "bottom_m": "18.400",
+          "upper_pressure": "11125.46315789473684210526316",
+          "lower_pressure": "11206.2"
+        },
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "18.400",
+          "bottom_m": "19.500",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "integral-average",
+      "unrounded": [
+        "4331.420242914979757085020243",
+        "4331.420242914979757085020243"
+      ],
+      "calculated": [
+        "4331.4",
+        "4331.4"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "4208.6",
+        "4208.6"
+      ],
+      "difference": [
+        "122.8",
+        "122.8"
+      ],
+      "matches_reference": false
+    },
+    {
+      "member": 163,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "19.500",
+      "bottom_m": "20.800",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "19.500",
+          "bottom_m": "20.800",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 164,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "20.800",
+      "bottom_m": "22.100",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "20.800",
+          "bottom_m": "22.100",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 165,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "22.100",
+      "bottom_m": "23.400",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "22.100",
+          "bottom_m": "23.400",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 166,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "23.400",
+      "bottom_m": "24.700",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "23.400",
+          "bottom_m": "24.700",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 167,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "24.700",
+      "bottom_m": "26.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "24.700",
+          "bottom_m": "26.000",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 168,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "26.000",
+      "bottom_m": "27.300",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "26.000",
+          "bottom_m": "27.300",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 169,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "27.300",
+      "bottom_m": "28.600",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "27.300",
+          "bottom_m": "28.600",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 170,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "28.600",
+      "bottom_m": "29.900",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "28.600",
+          "bottom_m": "29.900",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    },
+    {
+      "member": 171,
+      "group": 6,
+      "model_column": 3,
+      "pressure_column": 1,
+      "top_m": "29.900",
+      "bottom_m": "31.000",
+      "pieces": [
+        {
+          "layer": 7,
+          "sdc_line": 193,
+          "top_m": "29.900",
+          "bottom_m": "31.000",
+          "upper_pressure": "3088.8",
+          "lower_pressure": "3088.8"
+        }
+      ],
+      "method": "linear-endpoints",
+      "unrounded": [
+        "3088.8",
+        "3088.8"
+      ],
+      "calculated": [
+        "3088.8",
+        "3088.8"
+      ],
+      "current": [
+        "",
+        ""
+      ],
+      "reference": [
+        "3088.8",
+        "3088.8"
+      ],
+      "difference": [
+        "0",
+        "0"
+      ],
+      "matches_reference": true
+    }
+  ],
+  "configuration": {
+    "push_direction": "right",
+    "groups": {
+      "4": 1,
+      "5": 2,
+      "6": 3
+    },
+    "decimals": 1,
+    "rounding": "ROUND_HALF_UP",
+    "cross_layer": "integral-average"
+  },
+  "sources": {
+    "sdc": {
+      "path": "C:\\Users\\sasai\\Documents\\structural-design\\test\\今町橋りょう4P(右).sdc",
+      "sha256": "9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7"
+    },
+    "ndu": {
+      "path": "C:\\Users\\sasai\\Documents\\structural-design\\test\\今町橋りょう4P(C方向･右押し→).ndu",
+      "sha256": "8b59834f3aa75bee053f799b73f956e66ccf8c09153afc86d0f07556efdc4bc7"
+    },
+    "reference": {
+      "path": "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→).ndu",
+      "sha256": "703fd48092d3c4e0592ccb945538b03149f4cfa487d44b600f2a671fffe66a72"
+    }
+  },
+  "output_sha256": "8618fe849fea3f05934cd7053f577cb70a0326ede4a2d5582095934a48038797"
+}
