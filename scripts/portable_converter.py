@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 import hashlib
 import json
 import os
@@ -15,8 +16,11 @@ import fill_jiban_shogen as base
 import fill_jiban_pressure as pressure
 import fill_suppot_info as support
 import fill_pile_tip_suppot_info as tip
+import calculation_record
+import excel_report
+from kg_candidates import inspect_candidates, validate_groups
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 APP_NAME = "SDCConverter"
 InputError = base.InputError
 OPERATIONS = {
@@ -37,6 +41,13 @@ class Request:
     push_direction: str = "right"
     # 周面方式は呼び出し元で明示する。CLIと同じ制約を保つ。
     shaft_profile: str | None = None
+    horizontal_cross_layer: str = "length-weighted"
+    pressure_cross_layer: str = "integral-average"
+    pressure_decimals: int = 1
+    shaft_k_decimals: int = 0
+    shaft_force_decimals: int = 1
+    # GUIチェックリストの再検証。項目別CLIは従来どおり必要な表だけで実行できる。
+    require_matching_lengths: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,6 +65,7 @@ class Plan:
     data: bytes
     rows: tuple[PreviewRow, ...]
     report: dict
+    workbook: excel_report.ReportBook | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +73,8 @@ class Saved:
     output: Path
     backup: Path | None
     report: Path
+    excel: Path | None = None
+    workbook: excel_report.ReportBook | None = None
 
 
 def digest(data: bytes) -> str:
@@ -101,6 +115,10 @@ def prepare(request: Request) -> Plan:
         raise InputError("周面ばねは『既存画面方式』を明示してください。")
     if request.push_direction not in ("right", "left"):
         raise InputError("土圧の押す方向は right / left を指定してください。")
+    if request.horizontal_cross_layer not in ("length-weighted", "midpoint", "skip", "error") or request.pressure_cross_layer not in ("integral-average", "endpoints", "error"):
+        raise InputError("境界処理の指定が不正です。")
+    if any(type(d) is not int or d not in range(7) for d in (request.pressure_decimals, request.shaft_k_decimals, request.shaft_force_decimals)):
+        raise InputError("丸め桁数は0～6を指定してください。")
     groups = base.parse_groups(list(request.groups))
     if not groups:
         raise InputError("杭グループを KG番号:列番号 の形式で指定してください。")
@@ -110,34 +128,47 @@ def prepare(request: Request) -> Plan:
         raise InputError("入力ファイル同士が同じ実体を参照しています。")
     sources = tuple((p, p.read_bytes()) for p in paths)
     sdc_raw, ndu_raw = sources[0][1], sources[1][1]
+    # GUIの候補確認後に原本が編集されても、実際に計算するバイト列で再判定する。
+    if request.require_matching_lengths:
+        validate_groups(inspect_candidates(ndu_raw, sdc_raw), groups)
     ndu = base.parse_ndu(ndu_raw)
     result = ndu_raw
-    rows, details = [], {}
+    rows, details, profiles = [], {}, {}
     # 選択順によらず同じ手順で処理する。保存は全項目が成功した後だけ。
     for operation in OPERATIONS:
         if operation not in operations:
             continue
         if operation == "horizontal":
             layers = base.parse_sdc(sdc_raw)
+            profiles[operation] = layers
             updates, evidence = {}, []
             current = base.parse_ndu(result)
             for member in base.collect_members(ndu, groups):
                 overlaps = base.find_overlaps(member, layers)
-                value = base.select_value(member, overlaps, "length-weighted")
-                updates[member.number] = value
+                value = base.select_value(member, overlaps, request.horizontal_cross_layer)
+                if value is not None:
+                    updates[member.number] = value
                 before = current.fields(f"JibanShogenInfo{member.number}", 7)[1]
+                actual = base.format_number(value) if value is not None else before
+                unrounded = sum((o.length * o.layer.values[member.column] for o in overlaps), Decimal(0)) / (member.bottom-member.top)
+                if len(overlaps) == 1 or request.horizontal_cross_layer == "midpoint":
+                    unrounded = value
                 rows.append(PreviewRow(OPERATIONS[operation], f"部材{member.number}",
-                                       before or "空欄", base.format_number(value)))
+                                       before or "空欄", actual or "空欄"))
                 evidence.append({"member": member.number, "group": member.group, "column": member.column,
-                                 "value": str(value), "pieces": [
+                                 "value": str(value) if value is not None else (before or None),
+                                 "method": "single-layer" if len(overlaps) == 1 else request.horizontal_cross_layer,
+                                 "unrounded_value": str(unrounded) if value is not None else None,
+                                 "midpoint_m": str((member.top+member.bottom)/2), "pieces": [
                                      {"sdc_line": o.layer.source_line, "length_m": str(o.length),
                                       "value": str(o.layer.values[member.column])} for o in overlaps]})
             result = base.render_ndu(current, updates)
             details[operation] = {"members": evidence, "count": len(updates)}
         elif operation == "pressure":
             current = base.parse_ndu(result)
-            updates, evidence = pressure.make_plan(current, pressure.parse_pressure_sdc(sdc_raw), groups,
-                                                   request.push_direction, 1, "integral-average")
+            profiles[operation] = pressure.parse_pressure_sdc(sdc_raw)
+            updates, evidence = pressure.make_plan(current, profiles[operation], groups,
+                                                   request.push_direction, request.pressure_decimals, request.pressure_cross_layer)
             for row in evidence["members"]:
                 rows.append(PreviewRow(OPERATIONS[operation], f"部材{row['member']}",
                                        " / ".join(v or "空欄" for v in row["current"]),
@@ -147,10 +178,13 @@ def prepare(request: Request) -> Plan:
         else:
             zeros = set()
             if operation == "shaft":
-                updates, zeros, tips, evidence = support.make_plan(ndu, support.parse_sdc(sdc_raw), groups)
-                details[operation] = {"nodes": evidence, "unchanged_tip_nodes": sorted(tips)}
+                profiles[operation] = support.parse_sdc(sdc_raw)
+                updates, zeros, tips, evidence = support.make_plan(ndu, profiles[operation], groups,
+                                                                  request.shaft_k_decimals, request.shaft_force_decimals)
+                details[operation] = {"nodes": evidence, "unchanged_tip_nodes": sorted(tips), "zero_resistance_nodes": sorted(zeros)}
             else:
-                updates, evidence = tip.make_plan(ndu, tip.parse_sdc(sdc_raw), groups)
+                profiles[operation] = tip.parse_sdc(sdc_raw)
+                updates, evidence = tip.make_plan(ndu, profiles[operation], groups)
                 details[operation] = {"nodes": evidence}
             rendered, summary = support.render_ndu(result, updates, zeros)
             previous = support_values(result)
@@ -166,15 +200,19 @@ def prepare(request: Request) -> Plan:
         raise InputError("変換結果の整合性を確認できませんでした。")
     report = {
         "application": APP_NAME, "version": VERSION,
+        "schema_version": calculation_record.SCHEMA_VERSION, "run_id": uuid4().hex,
+        "created_at": datetime.now().astimezone().isoformat(), "mode": "preview",
         "configuration": {"operations": list(operations), "groups": groups,
                           "push_direction": request.push_direction, "shaft_profile": request.shaft_profile,
-                          "horizontal_cross_layer": "length-weighted", "pressure_cross_layer": "integral-average",
-                          "pressure_decimals": 1, "shaft_k_decimals": 0, "shaft_force_decimals": 1},
+                          "horizontal_cross_layer": request.horizontal_cross_layer, "pressure_cross_layer": request.pressure_cross_layer,
+                          "pressure_decimals": request.pressure_decimals, "shaft_k_decimals": request.shaft_k_decimals,
+                          "shaft_force_decimals": request.shaft_force_decimals},
         "sources": [{"path": str(p), "sha256": digest(data)} for p, data in sources],
         "details": details, "output_sha256": digest(result),
         "preview": [vars(row) for row in rows],
     }
-    return Plan(ndu_path, sources, result, tuple(rows), report)
+    report["calculation"] = calculation_record.complete(report, sdc_raw, ndu_raw, result, profiles)
+    return Plan(ndu_path, sources, result, tuple(rows), report, excel_report.build(report))
 
 
 def verify_sources(plan: Plan) -> None:
@@ -226,7 +264,7 @@ def stage(output: Path, data: bytes) -> Path:
         raise
 
 
-def save(plan: Plan, output: Path, *, overwrite: bool = False) -> Saved:
+def save(plan: Plan, output: Path, *, overwrite: bool = False, excel: bool = True) -> Saved:
     """全計算終了→一時保存・照合→バックアップ→再確認→一括置換。"""
     output = Path(output).expanduser().resolve()
     validate_output(plan, output, overwrite)
@@ -234,35 +272,56 @@ def save(plan: Plan, output: Path, *, overwrite: bool = False) -> Saved:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f") + "-" + uuid4().hex[:8]
     backup = output.with_name(output.name + f".{stamp}.bak") if overwrite else None
     report_path = output.with_name(output.name + f".{stamp}.report.json")
-    report = dict(plan.report, output=str(output), backup=str(backup) if backup else None,
-                  saved_at=datetime.now().astimezone().isoformat())
+    excel_path = output.with_name(output.name + f".{stamp}.計算過程.xlsx") if excel else None
+    report = dict(plan.report, output=str(output), backup=str(backup) if backup else None, run_id=stamp,
+                  saved_at=datetime.now().astimezone().isoformat(), mode="saved",
+                  report_path=str(report_path), excel_path=str(excel_path) if excel_path else None)
+    workbook = excel_report.build(report)
+    excel_data = workbook.to_xlsx() if excel else None
+    if excel_data is not None:
+        report["excel_sha256"] = digest(excel_data)
     report_data = (json.dumps(report, ensure_ascii=False, indent=2, default=str) + "\n").encode("utf-8")
     pending = []
-    report_published = False
+    published = []
+    def publish(staged, path, data):
+        identity = staged.stat()
+        publish_new(staged, path)
+        published.append((path, identity.st_dev, identity.st_ino, data))
     try:
         staged = stage(output, plan.data)
         pending.append(staged)
         staged_report = stage(report_path, report_data)
         pending.append(staged_report)
+        if excel_path is not None:
+            staged_excel = stage(excel_path, excel_data)
+            pending.append(staged_excel)
         if backup is not None:
             original = next(data for path, data in plan.sources if path == plan.target)
             staged_backup = stage(backup, original)
             pending.append(staged_backup)
             publish_new(staged_backup, backup)
         # 報告書の保存が失敗しても、変換対象はまだ変更していない。
-        publish_new(staged_report, report_path)
-        report_published = True
+        if excel_path is not None:
+            publish(staged_excel, excel_path, excel_data)
+        publish(staged_report, report_path, report_data)
         validate_output(plan, output, overwrite)
         verify_sources(plan)
         if overwrite:
             os.replace(staged, output)
         else:
             publish_new(staged, output)
-    except BaseException:
-        if report_published:
-            report_path.unlink(missing_ok=True)
+    except BaseException as exc:
+        for path, dev, ino, data in reversed(published):
+            try:
+                current = path.stat()
+                if (current.st_dev, current.st_ino) == (dev, ino) and path.read_bytes() == data:
+                    path.unlink()
+            except OSError:
+                exc.add_note(f"帳票を取り消せませんでした: {path}")
+        if backup is not None and backup.exists():
+            exc.add_note(f"バックアップは保持しています: {backup}")
         raise
     finally:
         for path in pending:
             path.unlink(missing_ok=True)
-    return Saved(output, backup, report_path)
+    return Saved(output, backup, report_path, excel_path, workbook)

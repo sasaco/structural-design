@@ -52,6 +52,62 @@ def self_test(args, app_class):
                 app.paths["sdc"].set(str(args.sdc))
                 app.paths["ndu"].set(str(args.ndu))
                 app.paths["output"].set(str(destination / "GUI 保存.ndu"))
+                # NDUの全KGを候補表示し、チェックボックス操作で図と変換対象を連動。
+                view = app.model_preview
+                selector = app.group_selector
+                deadline = time.monotonic() + 15
+                while (view.model is None or not selector.ready) and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                assert view.model is not None, view.message.get()
+                assert selector.ready, selector.message.get()
+                assert set(selector.rows) == set(range(1, 7))
+                assert not view.selected
+                for group in (4, 5, 6):
+                    selector.rows[group].check.invoke()
+                assert selector.selection() == converter.DEFAULT_GROUPS
+                expected = set(range(98, 122)) | set(range(123, 147)) | set(range(148, 172))
+                assert view.selected == expected
+                assert len(view.canvas.find_withtag("selected")) == 72
+                for group in (4, 6):
+                    selector.rows[group].check.invoke()
+                assert view.selected == set(range(123, 147))
+                assert view.canvas.itemcget("element:123", "fill") == "#dc2626"
+                assert view.canvas.itemcget("element:98", "fill") == "#475569"
+                selector.rows[5].check.invoke()
+                assert not view.selected and not view.canvas.find_withtag("selected")
+                for row in selector.rows.values():
+                    row.column.set("")
+                for group in (4, 5, 6):
+                    selector.rows[group].check.invoke()
+                assert view.selected == expected
+                report["checks"].append({"model-preview": "live-kg-highlighting", "elements": len(view.model.elements),
+                                         "selected": len(view.selected)})
+                # 短いKG候補はEXEでも無効。処理ロック解除後にも復活しない。
+                shorter = destination / "杭長不一致.ndu"
+                shorter.write_bytes(args.ndu.read_bytes().replace(b"KGInfo4=21,98,121", b"KGInfo4=21,98,120"))
+                app.paths["ndu"].set(str(shorter))
+                assert not app.groups.get() and not selector.ready
+                deadline = time.monotonic() + 15
+                while not selector.ready and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                assert selector.ready, selector.message.get()
+                row = selector.rows[4]
+                assert not row.candidate.enabled
+                app.apply_states()
+                row.check.invoke()
+                assert row.check.instate(["disabled"]) and not row.selected.get()
+                assert "長さ不一致" in row.candidate.reason
+                report["checks"].append("kg-checkbox-length-mismatch-disabled")
+                app.paths["ndu"].set(str(args.ndu))
+                deadline = time.monotonic() + 15
+                while not selector.ready and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                assert selector.ready, selector.message.get()
+                for group in (4, 5, 6):
+                    selector.rows[group].check.invoke()
                 failures = []
                 app.show_error = lambda exc, trace: failures.append(trace)
                 for write in (False, True):
@@ -62,8 +118,14 @@ def self_test(args, app_class):
                         time.sleep(0.01)
                     assert not app.busy, "GUI worker timed out"
                     assert not failures, failures
-                    assert len(app.tree.get_children()) == 207
+                    assert len(app.excel_preview.book.sheets) == 6
+                    assert app.excel_preview.sheet.name == "変換結果"
+                    assert len(app.excel_preview.canvas.find_all()) > 0
+                    assert "入力値" not in app.excel_preview.sheet_box["values"]
                 assert app.last_saved.output.is_file()
+                assert app.last_saved.excel.is_file()
+                assert app.last_saved.excel.read_bytes()[:2] == b"PK"
+                assert str(app.open_excel_button["state"]) == "normal"
                 assert app.last_saved.output.read_bytes() == converter.prepare(
                     converter.Request(args.sdc, args.ndu, shaft_profile="existing-screen")).data
                 assert str(app.save_button["state"]) == "normal"

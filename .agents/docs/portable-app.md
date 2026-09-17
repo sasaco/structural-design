@@ -5,7 +5,7 @@
 
 ## 利用と対応範囲
 
-配布ZIP: `dist/SDCConverter-v1.0.0-win-x64.zip`。
+配布ZIP: `dist/SDCConverter-v1.1.0-win-x64.zip`。
 展開した `SDCConverter/SDCConverter.exe` を実行する。
 Python・pip・Visual Studio・Excelは利用者PCに不要。
 EXEと `_internal` は同じフォルダーに置く。
@@ -26,21 +26,76 @@ GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="
 
 ## ソース構成
 
-- `scripts/sdc_converter_app.py`: GUI、ファイル選択、確認一覧、バックグラウンド実行、関連付けアプリで開く。
+- `scripts/sdc_converter_app.py`: GUI、ファイル選択、Excelプレビュー、バックグラウンド実行、関連付けアプリで開く。
+- `scripts/calculation_record.py` / `excel_report.py` / `excel_preview.py`: 共通計算記録、Excel生成、同じセルモデルのプレビュー。
+- `scripts/model_preview.py`: NDUのXYモデル図、KG入力に連動する対象部材の赤色表示、拡大・移動。
+- `scripts/kg_candidates.py`: KGInfoの列挙、SDC地層厚合計と部材長合計の照合。
+- `scripts/kg_selection.py`: KGInfoチェックリスト、SDCモデル列の選択、候補のバックグラウンド再読込。
 - `scripts/portable_converter.py`: `Request` → `prepare()` → `Plan` → `save()`。GUI非依存。
 - `scripts/portable_smoke.py`: Python / EXE共用の起動・実データ変換検証。
 - `scripts/build_portable.py`: 既存を含むテスト、ビルド、ZIP展開、EXE検証、配布ZIPとSHA-256出力。
-- `requirements-build.txt`: 開発PCのビルド依存を固定。アプリ本体はPython標準ライブラリのみ。
+- `requirements.txt`: Excel生成用XlsxWriter 3.2.9。`requirements-build.txt` はこれとビルド依存を固定。
 
 4つのCLIの計算モジュールから、関数を直接importする。
 同梱EXEで `sys.executable` をPython CLIとして再起動する方式は使わない。
 GUI入力にはリポジトリ内の `test` / `snap` の既定パスを流用しない。
 
+## KGInfoの選択と長さの照合
+
+KG番号のテキスト入力を廃止し、入力NDU内の全 `KGInfo` を番号順のチェックリストに表示する。
+2026-09-17、ユーザーが対象拡張子は現行の `.ndu` でよいと確認済み。
+各行にはKG番号、開始～終了部材、部材長合計、SDCモデル列、選択不可の理由を表示する。
+初期状態は全件未選択。チェックすると未使用のSDC列を仮設定し、コンボボックスで列を変更できる。
+同一列の重複、列の未選択、KG未選択は処理を開始しない。
+対象の杭をモデル図で確認し、列は左から右へ指定する。従来の `4:1 5:2 6:3` は
+KGInfo4・5・6を順にチェックすると指定できる。CLIの既定値は変更しない。
+
+地層厚は [水平地盤ばねの仕様](fill-jiban-shogen-script.md) と同じSDC直角方向の
+`b）水平地盤ばね値` 表から取得し、全層の厚さを合計する。
+部材長はKGInfoの開始～終了部材と `ElementInfo` 第5・6フィールドの端節点、
+`JointXY` の座標から取得する。既存と同じ鉛直杭の条件で各部材長を合計し、
+両方の合計を `Decimal.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)` で
+小数第3位（0.001 m）に四捨五入してから一致を判定する。2026-09-17のユーザー追加指定。
+各層・各部材の段階では丸めず、合計後に1回だけ丸める。差を許容値と比較する方式ではない。
+一覧の合計と不一致時の差も、この比較値を小数3桁で表示する。計算に使う元の層厚・座標は保持する。
+短い候補・長い候補の両方を非活性にし、差をm単位で表示する。
+欠損部材／節点、非鉛直、部材の隙間・重複等で算出できない候補も非活性にして理由を表示する。
+SDC未選択・読込エラー時はNDUの候補を表示したまま全件非活性にする。
+
+SDCまたはNDUのパスを変更すると直ちに選択を解除し、250ms後に再読込する。
+同じパスのファイルを外部編集した場合は「再読込」を使用する。
+古い読込結果は採用しない。変換処理中はチェック・列変更・再読込を無効にし、
+処理終了後も長さ不一致候補は非活性のままにする。
+GUIは `Request(require_matching_lengths=True)` を指定し、`prepare()` でも
+実際に計算する入力バイト列で再判定する。既存の項目別CLI/APIは必要な表のみで実行できる。
+
+実案件データではKGInfo1～6は全て31.000 m、右SDCも31.000 mなので全6候補が長さ条件を満たす。
+長さ一致のみで左右の基礎が同一とは判断しない。対象KGと列は利用者が選択する。
+
+## 入力画面のモデル図
+
+「入力・保存設定とモデル」タブの右側にTk Canvasでモデル図を表示する。NDUを選ぶだけで読み込み、
+SDCの選択や「Excelをプレビュー」の実行は不要。KGInfoのチェック・モデル列の選択変更で、
+指定した全KGの部材の線・番号を赤、それ以外を灰色で表示する。
+`4:1 5:2 6:3` はKGInfo4/5/6の開始〜終了部材範囲を対象とする。
+モデル列はSDCの対応列を指定するもので、描画対象の抽出はKG番号による。
+
+参照実装はAggre-SEの `ChildFormElementSetting.vb` / `MyPictureBox.vb`。
+NDUの `JointXY` のXY座標と `ElementInfo` の第5・6フィールドの端節点を使用し、
+Yは下向き、縦横別縮尺で全体に収める。ホイール・＋／−で拡大縮小、ドラッグで移動、
+「全体表示」で復帰し、対象部材番号の表示を切り替えられる。
+
+ファイルパス編集は250ms待ってバックグラウンド読込。ファイル変更時には前の図を消し、
+古い読込結果を採用しない。未選択は赤色解除、不正な対応・存在しないKG・欠損した部材範囲は
+全ての赤色を解除して図内の説明欄へ表示。読込不良時は図を消して理由を表示する。
+図はKG範囲の確認用で、鉛直杭・杭列順・SDCとの整合などの計算条件は既存の `prepare()` で検証する。
+
 ## 開発環境での起動
 
 Windows x64、Python 3.12 x64 + Tkinterがある開発PCで、リポジトリ直下から実行する。
 GUIのローカル実行にEXEの再ビルドやPyInstallerのインストールは不要。
-アプリ本体はPython標準ライブラリのみを使用する。
+アプリ本体はPython標準ライブラリとXlsxWriterを使用する。
+初回は `uv pip install --python .venv/Scripts/python.exe -r requirements.txt` で実行依存を入れる。
 
 ### VS CodeでF5起動
 
@@ -88,7 +143,7 @@ py -3.12 -m venv .venv
 `.venv-build/Scripts/python.exe` で `scripts/build_portable.py` を実行する。
 テスト、EXEビルド、ZIP展開後の検証が順に実行され、ログは統合ターミナルに表示される。
 子プロセスのテストやPyInstallerにデバッガーが自動接続しないよう `subProcess: false` を指定する。
-成功すると `dist/SDCConverter-v1.0.0-win-x64.zip` と `.zip.sha256`、`packaged-smoke.json` が生成される。
+成功すると `dist/SDCConverter-v1.1.0-win-x64.zip` と `.zip.sha256`、`packaged-smoke.json` が生成される。
 GUIを起動したい場合は、構成を **SDC Converter: GUI** に切り替える。
 
 ### 初回セットアップとターミナルからのビルド
@@ -140,12 +195,27 @@ PyInstallerの方式は [公式動作説明](https://pyinstaller.org/en/stable/o
 `tests/test_portable_converter.py` は項目選択、NDUの制約、実モデル一括変換、
 入力不変、バックアップ、既存出力・ハードリンク・入力変更・出力競合・保存障害を検証する。
 計算・CLI・共通保存処理を含む全テストをビルド前に実行する。
+`tests/test_kg_selection.py` は長さ一致／不足／超過、小数第3位への四捨五入と境界値・合計後の丸め、不正な杭、SDC未選択、
+候補ゼロ、チェック・列変更、処理後の非活性維持、ファイル切替・再読込・読込競合、変換時の再検証を確認する。
+`tests/test_model_preview.py` は実モデルの対象72部材と変換対象の一致、入力編集での赤色・番号の
+切替、不正入力での解除、読込エラー、ファイル変更後に古い読込結果を採用しないことを検証する。
 
 ビルド時はZIPを日本語・空白入りパスへ展開し、Python等を含まないPATHとリポジトリ外の
 作業フォルダーでEXEを起動する。Tkinter、CP932、実モデルNDUの4項目207件、
 再実行の同一性、バックアップ、入力原本不変を検証。
-GUIのワーカー・イベントキューを通る「入力値を確認→変換して保存」も検証。
+GUIのワーカー・イベントキューを通る「Excelをプレビュー→変換して保存」も検証。
+EXEでもモデル図171部材の読込・KG4/5/6のチェックによる72部材の赤色表示・選択解除、
+長さ不一致候補のチェック無効化、入力の選び直しを検証。
 検証レポートは `dist/packaged-smoke.json`。実画面でも起動・日本語表示・実行ボタンの配置を確認する。
 
 Input-JR/JRSNAPでの読込み・解析実行、別のクリーンPCでの実行、EXE署名は未実施。
 PythonをPATHから除いた同一PCでの検証を「クリーンPC検証済み」とは扱わない。
+
+## Excel帳票とプレビュー（1.1.0）
+
+従来の `preview_rows` の履歴一覧を、出力Excelと同じセル・数式・色・シートの読取専用表示へ変更。
+「Excelをプレビュー」では保存せず、「変換して保存」でモデル・JSON・既定オンのExcelを作成する。
+Excel選択時はその生成・検証・一時保存を完了してからモデルを公開する。
+通常の保存失敗では今回の帳票を取り消し、作成済みバックアップを保持する。
+同一性が変わった他プロセスの帳票は削除しない。
+利用方法・CLI・数式検証は [Excel実装記録](excel-report-implementation.md) を参照。

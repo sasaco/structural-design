@@ -173,7 +173,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:SDC列")
     parser.add_argument("--output", type=Path, help="別名NDU。省略時は確認表示")
     parser.add_argument("--report", type=Path, help="参照値・配置・NDU比較結果を保存するJSON")
+    parser.add_argument("--excel-report", type=Path, help="計算過程の.xlsx（モデル保存省略時は確認帳票）")
     args = parser.parse_args(argv)
+    if args.excel_report:
+        from excel_cli import run
+        return run("tip", args)
     try:
         suffix = ".ndu"
         if args.output and args.output.suffix.lower() != suffix:

@@ -53,13 +53,19 @@ def main():
     for item in pyinstaller.files or []:
         if "license" in str(item).lower() and str(item).endswith(".txt"):
             shutil.copyfile(pyinstaller.locate_file(item), licenses / ("PyInstaller-" + Path(item).name))
+    xlsxwriter = importlib.metadata.distribution("XlsxWriter")
+    for item in xlsxwriter.files or []:
+        if "license" in str(item).lower() and str(item).endswith(".txt"):
+            shutil.copyfile(xlsxwriter.locate_file(item), licenses / ("XlsxWriter-" + Path(item).name))
     source_files = [ROOT / "scripts" / name for name in (
-        "sdc_converter_app.py", "portable_converter.py", "portable_smoke.py", "fill_jiban_shogen.py",
+        "sdc_converter_app.py", "model_preview.py", "kg_candidates.py", "kg_selection.py", "excel_preview.py", "excel_report.py", "excel_cli.py",
+        "calculation_record.py", "portable_converter.py", "portable_smoke.py", "fill_jiban_shogen.py",
         "fill_jiban_pressure.py", "fill_suppot_info.py", "fill_pile_tip_suppot_info.py", "build_portable.py")]
-    source_files += [ROOT / "requirements-build.txt", ROOT / "docs/SDCConverter-README.txt"]
+    source_files += [ROOT / "requirements.txt", ROOT / "requirements-build.txt", ROOT / "docs/SDCConverter-README.txt"]
     source_files += sorted(path for path in (ROOT / "docs/licenses").rglob("*") if path.is_file())
     info = {"application": APP_NAME, "version": VERSION, "platform": "win-x64",
             "built_at": datetime.now(timezone.utc).isoformat(), "python": sys.version,
+            "runtime_dependencies": {"XlsxWriter": importlib.metadata.version("XlsxWriter")},
             "build_dependencies": {name: importlib.metadata.version(name) for name in (
                 "pyinstaller", "pyinstaller-hooks-contrib", "altgraph", "packaging", "pefile", "pywin32-ctypes", "setuptools")},
             "source_sha256": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()

@@ -1,0 +1,2 @@
+# Runtime dependency, bundled in the portable application.
+XlsxWriter==3.2.9

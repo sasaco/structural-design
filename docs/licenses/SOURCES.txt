@@ -11,3 +11,6 @@ including libmpdec, zlib and other standard-library components.
 
 The build also copies the installed Python LICENSE.txt, Tcl/Tk license.terms
 and PyInstaller COPYING.txt to the adjacent licenses directory.
+
+XlsxWriter 3.2.9: https://xlsxwriter.readthedocs.io/license.html
+The build copies the installed XlsxWriter LICENSE.txt to licenses/.

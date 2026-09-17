@@ -210,7 +210,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reference", type=Path, help="既存値と照合するNDU。入力値の算出には使わない")
     parser.add_argument("--output", type=Path, help="計算値を入力したNDUの新規出力先。省略時は表示のみ")
     parser.add_argument("--report", type=Path, help="計算根拠・照合差分のJSON出力先")
+    parser.add_argument("--excel-report", type=Path, help="計算過程の.xlsx（モデル保存省略時は確認帳票）")
     args = parser.parse_args(argv)
+    if args.excel_report:
+        from excel_cli import run
+        return run("pressure", args)
     try:
         inputs = [p.resolve() for p in (args.sdc, args.ndu, args.reference) if p is not None]
         outputs = [p.resolve() for p in (args.output, args.report) if p is not None]

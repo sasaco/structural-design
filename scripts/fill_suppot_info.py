@@ -360,7 +360,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force-decimals", type=int, choices=range(7), default=1)
     parser.add_argument("--output", type=Path, help="別名NDU。省略時は確認表示")
     parser.add_argument("--report", type=Path, help="計算根拠と出力フィールドのJSON（確認表示時にも出力可）")
+    parser.add_argument("--excel-report", type=Path, help="計算過程の.xlsx（モデル保存省略時は確認帳票）")
     args = parser.parse_args(argv)
+    if args.excel_report:
+        from excel_cli import run
+        return run("shaft", args)
     try:
         if args.output and not args.profile:
             raise InputError("出力時は --profile existing-screen を指定してください（押込みK1/Fyを正負の全勾配/制限値へ設定、先端保持）")

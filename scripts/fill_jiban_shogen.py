@@ -298,7 +298,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cross-layer", choices=["error", "length-weighted", "midpoint", "skip"], default="length-weighted",
                         help="層境界: length-weighted=長さ加重平均・整数四捨五入、error=中止、midpoint=中央の層、skip=保留（既定: length-weighted）")
     parser.add_argument("--write", action="store_true", help="NDUを更新する（省略時は結果表示のみ）。元データを.ndu.bakへ保存")
+    parser.add_argument("--excel-report", type=Path, help="計算過程の.xlsx（モデル保存省略時は確認帳票）")
     args = parser.parse_args(argv)
+    if args.excel_report:
+        from excel_cli import run
+        return run("horizontal", args)
     try:
         groups = parse_groups(args.groups)
         layers = parse_sdc(args.sdc.read_bytes())
