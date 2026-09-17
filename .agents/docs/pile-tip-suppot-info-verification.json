@@ -1,0 +1,158 @@
+{
+  "configuration": {
+    "profile": "existing-tip",
+    "groups": {
+      "4": 1,
+      "5": 2,
+      "6": 3
+    },
+    "direction": "直角方向",
+    "k3": "K2",
+    "negative_limits": "blank",
+    "rounding": "none",
+    "length_or_pile_count_factor": "none",
+    "shaft_resistance": "not-added",
+    "output_format": ".ndt"
+  },
+  "field_names": [
+    "開始節点",
+    "終点節点",
+    "拘束方向",
+    "K1+",
+    "F1+",
+    "F1-",
+    "K2+",
+    "F2+",
+    "F2-",
+    "K3+",
+    "K1-",
+    "K2-",
+    "K3-"
+  ],
+  "sources": {
+    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(右).sdc": "9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7",
+    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→).ndu": "703fd48092d3c4e0592ccb945538b03149f4cfa487d44b600f2a671fffe66a72",
+    "C:\\Users\\sasai\\Documents\\structural-design\\snap\\今町橋りょう4P(C方向･右押し→)(Case1_ρm10_αf1_正向).ndt": "6a50150ac07051486347407f74c8c5629917a0121fd038071ca7f287d4b218ec"
+  },
+  "summary": {
+    "updated": 3,
+    "added": 0,
+    "support_count": 126
+  },
+  "nodes": [
+    {
+      "group": 4,
+      "column": 1,
+      "node": 122,
+      "x_m": "29.8",
+      "y_m": "44.041",
+      "pile_length_m": "31",
+      "spring_line": 275,
+      "force_line": 293,
+      "k1_kN_per_m": "327072",
+      "k2_kN_per_m": "88418",
+      "fy_kN": "7167.5",
+      "fu_kN": "16724.3",
+      "field4_to_13": [
+        "327072",
+        "7167.5",
+        " ",
+        "88418",
+        "16724.3",
+        " ",
+        "88418",
+        "327072",
+        "88418",
+        "88418"
+      ]
+    },
+    {
+      "group": 5,
+      "column": 2,
+      "node": 147,
+      "x_m": "33.5",
+      "y_m": "44.041",
+      "pile_length_m": "31",
+      "spring_line": 275,
+      "force_line": 293,
+      "k1_kN_per_m": "218048",
+      "k2_kN_per_m": "58945",
+      "fy_kN": "4778.4",
+      "fu_kN": "11149.5",
+      "field4_to_13": [
+        "218048",
+        "4778.4",
+        " ",
+        "58945",
+        "11149.5",
+        " ",
+        "58945",
+        "218048",
+        "58945",
+        "58945"
+      ]
+    },
+    {
+      "group": 6,
+      "column": 3,
+      "node": 172,
+      "x_m": "37.2",
+      "y_m": "44.041",
+      "pile_length_m": "31",
+      "spring_line": 275,
+      "force_line": 293,
+      "k1_kN_per_m": "327072",
+      "k2_kN_per_m": "88418",
+      "fy_kN": "7167.5",
+      "fu_kN": "16724.3",
+      "field4_to_13": [
+        "327072",
+        "7167.5",
+        " ",
+        "88418",
+        "16724.3",
+        " ",
+        "88418",
+        "327072",
+        "88418",
+        "88418"
+      ]
+    }
+  ],
+  "ndu_comparison": [
+    {
+      "node": 122,
+      "status": "match",
+      "entries": [
+        {
+          "key": "SuppotInfo124",
+          "line": 1479,
+          "differences": []
+        }
+      ]
+    },
+    {
+      "node": 147,
+      "status": "match",
+      "entries": [
+        {
+          "key": "SuppotInfo125",
+          "line": 1480,
+          "differences": []
+        }
+      ]
+    },
+    {
+      "node": 172,
+      "status": "match",
+      "entries": [
+        {
+          "key": "SuppotInfo126",
+          "line": 1481,
+          "differences": []
+        }
+      ]
+    }
+  ],
+  "output_sha256": "6a50150ac07051486347407f74c8c5629917a0121fd038071ca7f287d4b218ec"
+}

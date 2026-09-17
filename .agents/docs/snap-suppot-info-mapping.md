@@ -11,6 +11,8 @@
 
 後続の入力スクリプト `scripts/fill_suppot_info.py` を作成・レビュー済み。NDUとNDTに対応し、既存画面方式を明示的に選択して使用する。[使用方法・対応範囲・レビュー結果](fill-suppot-info-script.md)を参照。以下の調査は押込み／引抜き・各勾配を別々に検討したもので、入力スクリプトの限定profileと区別する。
 
+杭先端支持は別途 [先端ばね・支持力の対応調査](snap-pile-tip-suppot-info-mapping.md) と [先端入力スクリプト](fill-pile-tip-suppot-info-script.md) に記録した。先端の既存配置の再現であり、以下に残る周面抵抗との合成の論点は対象外。
+
 ## 1. 支点番号と節点番号を区別する
 
 NDUの1352～1353行は `SuppotNum=126`、`SuppotRow=126`。キーの綴りは `SupportInfo` ではなく **`SuppotInfo`**。
