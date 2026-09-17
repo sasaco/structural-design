@@ -245,6 +245,8 @@ def ndu_supports(raw: bytes):
 
 
 def render_ndu(raw: bytes, updates: dict[int, list[str]], zeros: set[int]):
+    # 追加前に同期する。旧支点数を超えたケース行を新しい支点へ流用しない。
+    raw = sync_ndu_support_cases(raw)
     lines, controls, entries = ndu_supports(raw)
     updated, seen, used = {}, set(), set()
     targets = set(updates) | zeros
@@ -287,7 +289,51 @@ def render_ndu(raw: bytes, updates: dict[int, list[str]], zeros: set[int]):
             if not eol(result[-1]):
                 result.append(newline)
             result.extend(new_lines)
-    return b"".join(result), {"updated": len(used), "added": len(added), "support_count": len(entries) + len(added)}
+    return sync_ndu_support_cases(b"".join(result)), {
+        "updated": len(used), "added": len(added), "support_count": len(entries) + len(added)}
+
+
+def sync_ndu_support_cases(raw: bytes) -> bytes:
+    """最終支点番号1～NとSuppot_ChokuKisoCaseNoを同期する（支点自体は削除しない）。
+
+    欠落は0で補い、支点数を超える0の行は削除する。既存値・書式は保持する。
+    支点の削除・再採番は、呼出し側でケース行も対にして行う必要がある。
+    """
+    lines, controls, entries = ndu_supports(raw)
+    prefix = b"Suppot_ChokuKisoCaseNo"
+    cases, removed = {}, set()
+    for index, line in enumerate(lines):
+        if not line.startswith(prefix):
+            continue
+        match = re.fullmatch(rb"Suppot_ChokuKisoCaseNo([1-9][0-9]*)=(.*)", line.rstrip(b"\r\n"))
+        if not match:
+            raise InputError("Suppot_ChokuKisoCaseNoのキー形式が不正です")
+        number = int(match[1])
+        if number in cases:
+            raise InputError(f"Suppot_ChokuKisoCaseNo{number}が重複しています")
+        value = count(match[2].decode("ascii"), f"Suppot_ChokuKisoCaseNo{number}")
+        cases[number] = index
+        if number > len(entries):
+            if value != 0:
+                raise InputError(f"Suppot_ChokuKisoCaseNo{number}: 対応する支点がない非0のケース行は自動削除しません")
+            removed.add(index)
+    missing = [n for n in range(1, len(entries) + 1) if n not in cases]
+    if not missing and not removed:
+        return raw
+    # 実NDUの配置を踏襲。ケース行がない場合は直接基礎リンク数の後へ置く。
+    anchors = [i for i, l in enumerate(lines) if l.startswith(b"G_intCHOKU_KISO_Link_Num=")]
+    anchor = max(cases.values()) if cases else max(anchors) if anchors else max(
+        (i for i, _ in entries.values()), default=controls["ShitenCaseNum"][0])
+    newline = eol(lines[anchor]) or next((eol(l) for l in lines if eol(l)), b"\r\n")
+    result = []
+    for index, line in enumerate(lines):
+        if index not in removed:
+            result.append(line)
+        if index == anchor and missing:
+            if result and not eol(result[-1]):
+                result.append(newline)
+            result.extend(prefix + str(n).encode("ascii") + b"=0" + newline for n in missing)
+    return b"".join(result)
 
 
 def card(lines: list[bytes], name: bytes) -> tuple[int, int]:

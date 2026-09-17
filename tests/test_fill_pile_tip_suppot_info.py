@@ -115,6 +115,8 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(summary, {"updated": 0, "added": 1, "support_count": 1})
         added = b"SuppotInfo1= ,405,2," + ",".join(updates[405]).encode() + b"\r\n"
         expected = raw.replace(b"SuppotNum=0", b"SuppotNum=1").replace(b"SuppotRow=0", b"SuppotRow=1")
+        expected = expected.replace(b"G_intCHOKU_KISO_Link_Num=0\r\n",
+                                    b"G_intCHOKU_KISO_Link_Num=0\r\nSuppot_ChokuKisoCaseNo1=0\r\n")
         self.assertEqual(result, expected.replace(b"ShitenCaseNum=0\r\n", b"ShitenCaseNum=0\r\n" + added))
 
     def test_ndt_fixed_width_blanks_update_and_append(self):
@@ -185,6 +187,18 @@ class CliTests(unittest.TestCase):
         self.ndt.write_bytes(changed)
         self.assertEqual(self.run_cli("--ndt", str(self.ndt), "--output", str(self.root / "bad.ndt")), 1)
         self.assertFalse((self.root / "bad.ndt").exists())
+
+    def test_existing_tip_output_repairs_missing_cases_without_adding_supports(self):
+        raw = b"".join(l for l in ndu_bytes().splitlines(keepends=True)
+                       if not l.startswith(b"Suppot_ChokuKisoCaseNo"))
+        self.ndu.write_bytes(raw)
+        output, report = self.root / "out.ndu", self.root / "report.json"
+        self.assertEqual(self.run_cli("--output", str(output), "--report", str(report)), 0)
+        result = output.read_bytes()
+        self.assertIn(b"Suppot_ChokuKisoCaseNo1=0\r\nSuppot_ChokuKisoCaseNo2=0\r\n", result)
+        self.assertEqual(json.loads(report.read_text(encoding="utf8"))["summary"],
+                         {"updated": 1, "added": 0, "support_count": 2})
+        self.assertEqual(self.ndu.read_bytes(), raw)
 
     def test_output_and_report_conflicts_rejected_before_writes(self):
         output, report = self.root / "out.ndu", self.root / "report.json"

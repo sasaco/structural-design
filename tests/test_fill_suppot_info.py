@@ -52,8 +52,10 @@ def ndu_bytes(existing=False, empty=False):
     if existing:
         entries += support(3, 203).replace(",91,", ", 91 ,")
     total = 0 if empty else 3 if existing else 2
+    cases = "".join(f"Suppot_ChokuKisoCaseNo{i}=0\r\n" for i in range(1, total + 1))
     return (body + f"SuppotNum={total}\r\nSuppotRow={total}\r\nSuppotAlf=0,0\r\nShitenCaseNum=0\r\n"
-            + entries + "FootRow=0\r\nUntouched= 末尾の空白 ").encode("cp932")
+            + entries + "FootRow=0\r\nChokuKisoNum=0\r\nG_intCHOKU_KISO_Link_Num=0\r\n"
+            + cases + "Untouched= 末尾の空白 ").encode("cp932")
 
 
 def ndt_row(node, direction=2, values=None):
@@ -163,12 +165,14 @@ class NduWriterTests(unittest.TestCase):
     def setUp(self):
         self.updates, self.zeros, _, _ = plan()
 
-    def test_empty_support_table_adds_rows_and_counts_only(self):
+    def test_empty_support_table_adds_rows_counts_and_cases(self):
         raw = ndu_bytes(empty=True)
         result, summary = app.render_ndu(raw, self.updates, self.zeros)
         self.assertEqual(summary, {"updated": 0, "added": 2, "support_count": 2})
         expected = raw.replace(b"SuppotNum=0", b"SuppotNum=2").replace(b"SuppotRow=0", b"SuppotRow=2")
         added = (support(1, 203, values=self.updates[203]) + support(2, 702, values=self.updates[702])).encode()
+        expected = expected.replace(b"G_intCHOKU_KISO_Link_Num=0\r\n",
+                                    b"G_intCHOKU_KISO_Link_Num=0\r\nSuppot_ChokuKisoCaseNo1=0\r\nSuppot_ChokuKisoCaseNo2=0\r\n")
         self.assertEqual(result, expected.replace(b"ShitenCaseNum=0\r\n", b"ShitenCaseNum=0\r\n" + added))
 
     def test_existing_update_preserves_other_fields_tip_other_direction_and_bytes(self):
@@ -178,6 +182,7 @@ class NduWriterTests(unittest.TestCase):
         self.assertIn(support(1, 203, 1).encode(), result)
         self.assertIn(support(2, 405).encode(), result)
         self.assertIn(b"SuppotInfo3= ,203,2, 10 ,2,2,10,2,2,10,10,10,10\r\n", result)
+        self.assertIn(b"Suppot_ChokuKisoCaseNo3=0\r\nSuppot_ChokuKisoCaseNo4=0\r\n", result)
         self.assertTrue(result.endswith("Untouched= 末尾の空白 ".encode("cp932")))
         self.assertEqual(app.render_ndu(result, self.updates, self.zeros)[0], result)
 
@@ -198,6 +203,74 @@ class NduWriterTests(unittest.TestCase):
         for variant in variants:
             with self.subTest(variant=variant[-200:]), self.assertRaises(app.InputError):
                 app.render_ndu(variant, self.updates, self.zeros)
+
+
+class SupportCaseTests(unittest.TestCase):
+    def test_missing_cases_repaired_even_without_support_additions(self):
+        raw = ndu_bytes(existing=True)
+        for numbers in ([2], [1, 2, 3]):
+            with self.subTest(numbers=numbers):
+                incomplete = raw
+                for n in numbers:
+                    incomplete = incomplete.replace(f"Suppot_ChokuKisoCaseNo{n}=0\r\n".encode(), b"")
+                result, summary = app.render_ndu(incomplete, {}, set())
+                records = dict(l.split(b"=", 1) for l in result.splitlines() if b"=" in l)
+                self.assertEqual(summary, {"updated": 0, "added": 0, "support_count": 3})
+                self.assertEqual({k: v for k, v in records.items() if k.startswith(b"Suppot_ChokuKisoCaseNo")},
+                                 {f"Suppot_ChokuKisoCaseNo{n}".encode(): b"0" for n in range(1, 4)})
+                self.assertEqual(app.render_ndu(result, {}, set())[0], result)
+
+    def test_existing_nonzero_values_and_bytes_survive_append(self):
+        raw = ndu_bytes(existing=True).replace(b"Suppot_ChokuKisoCaseNo2=0", b"Suppot_ChokuKisoCaseNo2= 7 ")
+        updates, zeros, _, _ = plan()
+        result, _ = app.render_ndu(raw, updates, zeros)
+        self.assertIn(b"Suppot_ChokuKisoCaseNo2= 7 \r\n", result)
+        self.assertIn(b"Suppot_ChokuKisoCaseNo4=0\r\n", result)
+        self.assertEqual(app.render_ndu(result, updates, zeros)[0], result)
+
+    def test_surplus_zero_cases_removed_after_count_decrease_including_zero(self):
+        raw = ndu_bytes(existing=True)
+        # 末尾の支点を削除し件数を直した入力。ケース行の消し忘れを補正する。
+        for total in (2, 0):
+            with self.subTest(total=total):
+                reduced = raw.replace(b"SuppotNum=3", f"SuppotNum={total}".encode()).replace(
+                    b"SuppotRow=3", f"SuppotRow={total}".encode())
+                reduced = b"".join(l for l in reduced.splitlines(keepends=True)
+                                   if not l.startswith(b"SuppotInfo") or int(l.split(b"=", 1)[0][10:]) <= total)
+                result, _ = app.render_ndu(reduced, {}, set())
+                expected = b"".join(l for l in reduced.splitlines(keepends=True)
+                                    if not l.startswith(b"Suppot_ChokuKisoCaseNo")
+                                    or int(l.split(b"=", 1)[0].removeprefix(b"Suppot_ChokuKisoCaseNo")) <= total)
+                self.assertEqual(result, expected)
+
+    def test_stale_zero_cases_are_replaced_when_supports_are_added(self):
+        raw = ndu_bytes(empty=True).replace(b"Untouched=", b"".join(
+            f"Suppot_ChokuKisoCaseNo{n}= 0 \r\n".encode() for n in range(1, 4)) + b"Untouched=")
+        updates, zeros, _, _ = plan()
+        result, _ = app.render_ndu(raw, updates, zeros)
+        expected, _ = app.render_ndu(ndu_bytes(empty=True), updates, zeros)
+        self.assertEqual(result, expected)
+
+    def test_orphan_nonzero_case_cannot_be_reused_for_a_new_support(self):
+        raw = ndu_bytes().replace(b"Untouched=", b"Suppot_ChokuKisoCaseNo3=5\r\nUntouched=")
+        updates, zeros, _, _ = plan()
+        with self.assertRaisesRegex(app.InputError, "非0"):
+            app.render_ndu(raw, updates, zeros)
+
+    def test_invalid_case_keys_values_and_duplicates_rejected(self):
+        for line in (b"Suppot_ChokuKisoCaseNo1=0", b"Suppot_ChokuKisoCaseNo0=0",
+                     b"Suppot_ChokuKisoCaseNo01=0", b"Suppot_ChokuKisoCaseNoX=0",
+                     b"Suppot_ChokuKisoCaseNo3=-1", b"Suppot_ChokuKisoCaseNo3=1.5",
+                     b"Suppot_ChokuKisoCaseNo3=", b"Suppot_ChokuKisoCaseNo3=NaN"):
+            with self.subTest(line=line), self.assertRaises(app.InputError):
+                app.render_ndu(ndu_bytes().replace(b"Untouched=", line + b"\r\nUntouched="), {}, set())
+
+    def test_missing_case_block_without_foundation_anchor_and_final_newline(self):
+        raw = ndu_bytes(existing=True)
+        raw = raw[:raw.index(b"FootRow=")].rstrip(b"\r\n")
+        result, _ = app.render_ndu(raw, {}, set())
+        self.assertEqual(result, raw + b"\r\n" + b"".join(
+            f"Suppot_ChokuKisoCaseNo{n}=0\r\n".encode() for n in range(1, 4)))
 
 
 class NdtWriterTests(unittest.TestCase):
@@ -290,6 +363,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.invoke(["--profile", "existing-screen", "--output", str(self.output), "--report", str(self.report)]), 1)
         self.assertFalse(self.output.exists())
         self.assertFalse(self.report.exists())
+
+    def test_orphan_case_leaves_output_and_report_absent(self):
+        raw = ndu_bytes().replace(b"Untouched=", b"Suppot_ChokuKisoCaseNo3=7\r\nUntouched=")
+        self.ndu.write_bytes(raw)
+        self.assertEqual(self.invoke(["--profile", "existing-screen", "--output", str(self.output),
+                                     "--report", str(self.report)]), 1)
+        self.assertFalse(self.output.exists())
+        self.assertFalse(self.report.exists())
+        self.assertEqual(self.ndu.read_bytes(), raw)
 
     def test_changed_input_is_rejected_before_writing(self):
         original = app.render_ndu
