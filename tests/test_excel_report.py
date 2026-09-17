@@ -67,10 +67,14 @@ class WorkbookTests(unittest.TestCase):
             self.assertEqual(normal.find('m:scheme',ns).attrib['val'],'none')
             for i in range(1,7):
                 root=ET.fromstring(archive.read(f'xl/worksheets/sheet{i}.xml'))
-                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'landscape')
+                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3) else 'landscape')
                 self.assertLessEqual(int(root.find('m:pageSetup',ns).attrib.get('scale','100')),100)
-                self.assertIsNotNone(root.find('m:rowBreaks',ns))
-                self.assertIsNotNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
+                if i in (2,3):
+                    self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[7,14] if i==2 else [9,18])
+                    self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
+                else:
+                    self.assertIsNotNone(root.find('m:rowBreaks',ns))
+                    self.assertIsNotNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
                 self.assertFalse(root.findall('.//m:c[@t="e"]',ns))
             workbook=ET.fromstring(archive.read('xl/workbook.xml'))
             self.assertEqual(len(workbook.findall('.//m:definedName[@name="_xlnm.Print_Area"]',ns)),6)

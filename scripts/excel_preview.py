@@ -86,7 +86,7 @@ class ExcelPreview(ttk.Frame):
         if not self.book: return
         self.sheet=self.book.sheet(self.sheet_name.get())
         self.selected=None
-        self.section_box.configure(values=[name for name,_ in self.sheet.sections])
+        self.section_box.configure(values=[name for name,_,_ in self.sheet.sections])
         self.section_name.set(self.sheet.sections[0][0] if self.sheet.sections else "")
         self.formula.set("セルを選択すると数式・値を表示します。青いリンクをダブルクリックすると計算明細へ移動します。")
         self.cell_name.set("セル")
@@ -108,8 +108,13 @@ class ExcelPreview(ttk.Frame):
 
     def go_section(self,_event=None):
         if not self.sheet:return
-        index=next((r for name,r in self.sheet.sections if name==self.section_name.get()),0)
-        self.canvas.yview_moveto(max(0,self.ys[index]-26*self.scale)/self.ys[-1])
+        r,c=next(((r,c) for name,r,c in self.sheet.sections if name==self.section_name.get()),(0,0))
+        self.scroll_to(r,c)
+
+    def scroll_to(self,r,c):
+        if self.sheet.block_width: c=c//self.sheet.block_width*self.sheet.block_width
+        self.canvas.yview_moveto(max(0,self.ys[r]-self.ys[0])/self.ys[-1])
+        self.canvas.xview_moveto(max(0,self.xs[c]-self.xs[self.sheet.freeze[1]])/self.xs[-1])
         self.schedule()
 
     def yview(self,*args):self.canvas.yview(*args);self.schedule()
@@ -134,9 +139,14 @@ class ExcelPreview(ttk.Frame):
         width,height=cv.winfo_width(),cv.winfo_height()
         first=max(0,bisect_right(self.ys,y0)-1)
         last=min(len(self.sheet.rows),bisect_right(self.ys,y0+height)+1)
-        normal=("Yu Gothic UI",max(8,round(10*self.scale)))
+        family="ＭＳ 明朝" if self.sheet.layout in ("horizontal","pressure") else "Yu Gothic UI"
+        normal=(family,max(8,round(10*self.scale)))
         bold=(*normal,"bold")
-        for r in range(first,last):
+        frozen=self.sheet.freeze[1]
+        rectangles = self.sheet.range_merges
+        # アンカーが上へスクロールしても、見えている縦結合の文字・外周を描く。
+        visible_rows = sorted(set(range(first,last)) | {r for (r,c),(b,e) in rectangles.items() if r<first<=b})
+        for r in visible_rows:
             row=self.sheet.rows[r]
             y1,y2=self.ys[r],self.ys[r+1]
             if r in self.sheet.merges:
@@ -146,28 +156,52 @@ class ExcelPreview(ttk.Frame):
                 font=("Yu Gothic UI",round(15*self.scale),"bold") if cell.style=="title" else bold if cell.style=="section" else normal
                 cv.create_text(x0+self.xs[0]+8,y1+5,anchor="nw",text=cell.display(),font=font,fill="#243B53",width=max(width-self.xs[0]-25,200))
             else:
-                # スクロール領域を先に描き、識別列A:Cを手前に固定する。
-                for c in [*range(3,len(row)),*range(min(3,len(row)))]:
+                spans={start:end for (rr,start),end in self.sheet.column_merges.items() if rr==r}
+                # タイトルはExcel同様に隣の空欄へ表示する（結合セルにはしない）。
+                spans.update({c:min(c+self.sheet.block_width-1,len(row)-1) for c,cell in enumerate(row)
+                              if cell.style in ("spring_title","pressure_title")})
+                covered={c for start,end in spans.items() for c in range(start+1,end+1)}
+                covered.update(cc for (a,b),(d,e) in rectangles.items() if a<=r<=d
+                               for cc in range(b,e+1) if (r,cc)!=(a,b))
+                # スクロール領域を先に描き、指定された識別列を手前に固定する。
+                for c in [*range(frozen,len(row)),*range(min(frozen,len(row)))]:
+                    if c in covered:continue
+                    if r<first and (r,c) not in rectangles:continue
                     cell=row[c]
-                    left=self.xs[c]+(x0 if c<3 else 0)
-                    right=self.xs[c+1]+(x0 if c<3 else 0)
+                    bottom,end = rectangles.get((r,c),(r,spans.get(c,c)))
+                    cell_bottom = self.ys[bottom+1]
+                    left=self.xs[c]+(x0 if c<frozen else 0)
+                    right=self.xs[end+1]+(x0 if c<frozen else 0)
                     if right<x0 or left>x0+width:continue
                     fill="#243B53" if cell.style=="header" else "#FFF2C6" if cell.style=="actual" else "#F8FAFC" if r%2 else "white"
                     color="white" if cell.style=="header" else "#175CAD" if cell.style in ("source","link") else "#202B3C"
+                    if cell.style.startswith(("spring","pressure")):fill,color="white","#202B3C"
                     if (r,c) in self.sheet.checks and cell.cached != 0:fill,color="#FDE5E5","#B42318"
-                    cv.create_rectangle(left,y1,right,y2,fill=fill,outline="#E3E8EF")
+                    cv.create_rectangle(left,y1,right,cell_bottom,fill=fill,outline="#E3E8EF" if cell.borders is None else "")
+                    if cell.borders:
+                        edges={"L":(left,y1,left,cell_bottom),"R":(right,y1,right,cell_bottom),"T":(left,y1,right,y1),"B":(left,cell_bottom,right,cell_bottom)}
+                        for edge in cell.borders:cv.create_line(*edges[edge],fill="#202B3C",width=max(1,self.scale))
                     value=cell.cached if cell.formula else cell.value
                     number=isinstance(value,(float,int,Decimal))
                     text=cell.display()
                     # 一覧ではセル幅で折り返し、完全な文字列は選択時のバーで読む。
-                    cv.create_text(right-6 if number else left+6,(y1+y2)/2,anchor="e" if number else "w",text=text,font=bold if cell.style=="header" else normal,fill=color,width=right-left-12)
-                    if self.selected==(r,c):cv.create_rectangle(left+1,y1+1,right-1,y2-1,outline="#1976B9",width=2)
+                    align=cell.align or ("right" if number else "left")
+                    x,anchor={"right":(right-6,"e"),"left":(left+6,"w"),"center":((left+right)/2,"center")}[align]
+                    y = (y1+cell_bottom)/2
+                    if cell.valign=="top":
+                        y,anchor = y1+2,{"right":"ne","left":"nw","center":"n"}[align]
+                    elif cell.valign=="bottom":
+                        y,anchor = cell_bottom-2,{"right":"se","left":"sw","center":"s"}[align]
+                    cv.create_text(x,y,anchor=anchor,justify=align,text=text,font=bold if cell.style=="header" else normal,fill=color,width=right-left-12)
+                    if self.selected==(r,c):cv.create_rectangle(left+1,y1+1,right-1,cell_bottom-1,outline="#1976B9",width=2)
+            if r<first:continue
             cv.create_rectangle(x0,y1,x0+self.xs[0],y2,fill="#F0F4F8",outline="#D5DEE8")
             cv.create_text(x0+self.xs[0]-6,(y1+y2)/2,text=str(r+1),anchor="e",font=normal,fill="#526174")
         # Excel列記号を上端に固定する。
-        for c in [*range(3,12),0,1,2]:
-            left=self.xs[c]+(x0 if c<3 else 0)
-            right=self.xs[c+1]+(x0 if c<3 else 0)
+        for c in [*range(frozen,len(self.sheet.widths)),*range(frozen)]:
+            left=self.xs[c]+(x0 if c<frozen else 0)
+            right=self.xs[c+1]+(x0 if c<frozen else 0)
+            if right<x0 or left>x0+width:continue
             cv.create_rectangle(left,y0,right,y0+self.ys[0],fill="#F0F4F8",outline="#D5DEE8")
             cv.create_text((left+right)/2,y0+self.ys[0]/2,text=address(0,c)[:-1],font=normal,fill="#526174")
         cv.create_rectangle(x0,y0,x0+self.xs[0],y0+self.ys[0],fill="#F0F4F8",outline="#D5DEE8")
@@ -176,10 +210,13 @@ class ExcelPreview(ttk.Frame):
         if not self.sheet:return
         x,y=self.canvas.canvasx(event.x),self.canvas.canvasy(event.y)
         if event.y<self.ys[0]:return
-        c=bisect_right(self.xs,event.x if event.x<self.xs[3] else x)-1
+        if event.x<self.xs[0]:return
+        c=bisect_right(self.xs,event.x if event.x<self.xs[self.sheet.freeze[1]] else x)-1
         r=bisect_right(self.ys,y)-1
         if r<0 or r>=len(self.sheet.rows):return
         if r in self.sheet.merges:c=0
+        c=next((start for (rr,start),end in self.sheet.column_merges.items() if rr==r and start<=c<=end),c)
+        r,c=next(((a,b) for (a,b),(d,e) in self.sheet.range_merges.items() if a<=r<=d and b<=c<=e),(r,c))
         if c<0 or c>=len(self.sheet.rows[r]):return
         self.selected=(r,c)
         cell=self.sheet.rows[r][c]
@@ -196,6 +233,6 @@ class ExcelPreview(ttk.Frame):
             name,r,c=link
             self.sheet_name.set(name)
             self.select_sheet()
-            self.canvas.yview_moveto(max(0,self.ys[r]-self.ys[0])/self.ys[-1])
+            self.scroll_to(r,c)
             self.selected=(r,c)
             self.schedule()
