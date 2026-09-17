@@ -186,7 +186,7 @@ class ReportBook:
 
     def fit_rows(self):
         for sheet in self.sheets:
-            if sheet.layout in ("horizontal", "pressure", "shaft"): continue  # 見本の行高と改行を保持する。
+            if sheet.layout in ("horizontal", "pressure", "shaft", "tip"): continue  # 見本の行高と改行を保持する。
             for r,row in enumerate(sheet.rows):
                 if r in sheet.merges: continue
                 lines=1
@@ -205,7 +205,7 @@ class ReportBook:
         """混在する表の見出しを改ページごとに再掲。セル参照は全シートで再配置する。"""
         maps={}
         for sheet in self.sheets:
-            if sheet.layout in ("horizontal", "pressure", "shaft"):
+            if sheet.layout in ("horizontal", "pressure", "shaft", "tip"):
                 maps[sheet.name] = {r:r for r in range(len(sheet.rows))}
                 continue
             old_rows,old_heights,old_merges=sheet.rows,sheet.heights,sheet.merges
@@ -314,9 +314,10 @@ class ReportBook:
                 if cell.style == "section": props.update(bold=True, bg_color="#E6EDF5")
                 if cell.style == "note": props.update(text_wrap=True, font_color="#526174")
                 if cell.style == "link": props.update(font_color="#175CAD", underline=True)
-                if cell.style.startswith(("spring", "pressure", "shaft")):
+                if cell.style.startswith(("spring", "pressure", "shaft", "tip")):
                     props.update(font_name="ＭＳ 明朝", font_size=10, align="center")
                 if cell.style in ("spring_title", "pressure_title", "shaft_title"): props["text_wrap"] = False
+                if cell.style.startswith("tip"): props["text_wrap"] = cell.style == "tip_header"
                 if cell.align: props["align"] = cell.align
                 if cell.valign: props["valign"] = {"center":"vcenter"}.get(cell.valign,cell.valign)
                 if cell.borders is not None:
@@ -361,7 +362,7 @@ class ReportBook:
                         ws.write_string(r,c,str(cell.value),style)
             for r,c in sheet.checks:
                 ws.conditional_format(r,c,r,c,{"type":"cell", "criteria":"!=", "value":0, "format":error_format})
-            if sheet.layout in ("horizontal", "pressure", "shaft"): ws.set_portrait()
+            if sheet.layout in ("horizontal", "pressure", "shaft", "tip"): ws.set_portrait()
             else: ws.set_landscape()
             ws.set_paper(9)
             # FitToPagesはExcelで手動改ページを無効にするため、A4横の有効幅へ
@@ -379,6 +380,9 @@ class ReportBook:
                 ws.set_margins(18/25.4,18/25.4,19/25.4,19/25.4)
                 ws.repeat_rows(0,1)
                 ws.set_zoom(85)
+            elif sheet.layout == "tip":
+                ws.set_margins(0.7,0.7,0.75,0.75)
+                # K表とF表で見出しが異なるため、必要な見出しは行配置で再掲する。
             else:
                 ws.set_margins(0.25,0.25,0.35,0.35)
                 ws.repeat_rows(0,3)
@@ -986,6 +990,115 @@ def build_shaft(book, spring, force, source, detail, fixed, src, length, links, 
         source.note(f"KG{row['group']} 節点{row['node']} K: {row['raw_k1_kN_per_m']} / F: {row['raw_fy_kN']}")
 
 
+def build_tip(book, sheet, source, rows, fixed, src, length, links, force_links):
+    """先端のK/Fを3列の上下2表にし、幾何・固定実入力・照合を入力根拠へ置く。"""
+    sheet.layout, sheet.freeze, sheet.print_scale = "tip", (0,0), 100
+    sheet.widths = [9,24.375,24.375]
+    line_height, header_height = 18.75, 30.75
+    # A4縦の上下余白を除いた高さ。プリンタの端数差を4pt確保する。
+    capacity = (297/25.4*72-2*0.75*72)*100/sheet.print_scale-4
+    heading_height = line_height*2+header_height
+    used = 0
+    positions = {}
+    quantities = (("K1","k1_kN_per_m",4,"spring_line","kN/m"),
+                  ("K2","k2_kN_per_m",7,"spring_line","kN/m"),
+                  ("Fy","fy_kN",5,"force_line","kN"),
+                  ("Fu","fu_kN",8,"force_line","kN"))
+    formats = {}
+    for label,key,_field,_line,_unit in quantities:
+        digits = max(max(0,-D(str(row[key])).normalize().as_tuple().exponent) for row in rows)
+        minimum = 1 if label in ("Fy","Fu") else 0
+        digits = max(minimum,digits)
+        formats[key] = "0" + (("."+"0"*minimum+"#"*(digits-minimum)) if digits else "")
+
+    def cell(value=None, *, style="tip", align="center", borders="", fmt="0"):
+        return Cell(formula=value,style=style,align=align,borders=borders,number_format=fmt) if isinstance(value,Expr) else Cell(value,style=style,align=align,borders=borders,number_format=fmt)
+
+    def add(values, height=line_height):
+        nonlocal used
+        r = sheet.add(values)
+        sheet.heights[r] = height
+        used += height
+        return r
+
+    def page():
+        nonlocal used
+        sheet.page_breaks.append(len(sheet.rows))
+        used = 0
+
+    def heading(title, unit_title, labels, continued=False):
+        r = add([cell(title+("（続き）" if continued else ""),style="tip_title",align="left"),cell(),cell()])
+        if not continued: sheet.sections.append((title,r,0))
+        add([cell("節点番号",style="tip_header",borders="LRTB"),
+             cell(unit_title,style="tip_header",borders="LRTB"),cell()],header_height)
+        add([cell(),*[cell(v,style="tip_header",borders="LRTB") for v in labels]])
+        sheet.range_merges[r+1,0] = (r+2,0)
+        sheet.column_merges[r+1,1] = 2
+
+    tables = (("杭先端のばね定数","杭先端の鉛直地盤ばね定数\nKtv(kN/m)",
+               ("短期（第１勾配）","短期（第２勾配）"),quantities[:2],links),
+              ("先端支持力","杭先端の鉛直地盤支持力\n(kN)",
+               ("降伏点","終局点"),quantities[2:],force_links))
+    for index,(title,unit_title,labels,items,target_links) in enumerate(tables):
+        if index:
+            table_height = heading_height + len(rows)*line_height
+            required = min(table_height,heading_height+line_height) if table_height>capacity else table_height
+            if used+2*line_height+required>capacity:
+                page()
+            else:
+                for _ in range(2): add([cell(),cell(),cell()])
+        heading(title,unit_title,labels)
+        for row in rows:
+            if used+line_height>capacity:
+                page()
+                heading(title,unit_title,labels,continued=True)
+            ident = row["id"]
+            values = [cell(row["node"],align="right",borders="LRTB")]
+            for _label,key,_field,line,_unit in items:
+                values.append(cell(src("tip",row[line],row["source_fields"][key]),borders="LRTB",fmt=formats[key]))
+            r = add(values)
+            target_links[ident] = (sheet.name,r,0)
+            for c,(_label,key,field,_line,_unit) in enumerate(items,1):
+                positions[ident,key] = (r,c)
+                book.expected.append((sheet.name,r,c,fixed[ident,field]["after"],ident))
+    sheet.print_last_row = len(sheet.rows)-1
+
+    source.section("先端の杭頭・最深節点と杭長",["KG","SDC列","杭頭節点","先端節点","x (m)",
+                   "杭頭y (m)","先端y (m)","座標差 (m)","SDC杭長 (m)","杭長差 (m)","支点項目","NDU行"])
+    for row in rows:
+        g = row["geometry"]
+        r = source.add([row["group"],row["column"],g["head_node"],row["node"],row["x_m"],g["origin_y_m"],
+                        row["y_m"],None,row["pile_length_m"],None,row["output"]["item"],row["output"]["line"]],
+                       styles={i:"source" for i in (4,5,6,8)},formats={i:LENGTH for i in range(4,10)})
+        source.set_formula(r,7,length(source.ref(r,6)-source.ref(r,5)))
+        source.set_formula(r,9,length(source.ref(r,7)-source.ref(r,8)))
+        source.checks.append((r,9))
+
+    source.section("先端の採用照合",["KG","SDC列","先端節点","支点項目","量（主表へ）","単位",
+                   "主表値","固定実入力","差","SDC行","CSV欄","NDU欄"])
+    for row in rows:
+        ident = row["id"]
+        for label,key,field,line,unit in quantities:
+            rr,cc = positions[ident,key]
+            r = source.add([row["group"],row["column"],row["node"],row["output"]["item"],
+                            Cell(label,style="link",link=(sheet.name,rr,cc)),unit,sheet.ref(rr,cc),
+                            numeric(fixed[ident,field]["after"]),None,row[line],row["source_fields"][key],field],
+                           styles={7:"actual"},formats={i:formats[key] for i in (6,7)})
+            source.set_formula(r,8,source.ref(r,6)-source.ref(r,7))
+            source.checks.append((r,8))
+    for title,offsets in (("先端のばね実入力 (kN/m)",[4,7,10,11,12,13]),("先端の制限値実入力 (kN)",[5,6,8,9])):
+        source.section(title,["KG","SDC列","節点","支点項目",*[fixed[rows[0]["id"],i]["label"] for i in offsets]])
+        for row in rows:
+            source.add([row["group"],row["column"],row["node"],row["output"]["item"],
+                        *[numeric(fixed[row["id"],i]["after"]) for i in offsets]],styles={i:"actual" for i in range(4,4+len(offsets))})
+    source.section("先端の正確な十進記録",["KG","先端節点","量","SDC原値の正確な文字列（追加丸めなし）"])
+    for row in rows:
+        for label,key,_field,_line,_unit in quantities:
+            source.add([row["group"],row["node"],label,str(row[key])])
+    source.note("先端はSDCの直角方向・短期K1/K2・地震時押込みFy/Fuをそのまま転記。杭長・本数の乗算、追加丸め、周面抵抗の加算は行いません。")
+    source.note("先端支点の第4～13欄は K1,Fy,空欄,K2,Fu,空欄,K2,K1,K2,K2。負側制限値F1−/F2−は空欄です。")
+
+
 def build(report):
     record, config = report["calculation"], report["configuration"]
     summary = Sheet("変換結果")
@@ -999,7 +1112,7 @@ def build(report):
     book = ReportBook([summary,*main_sheets,source_sheet])
     state = "モデル保存と同一実行" if report.get("mode") == "saved" else "計算確認・モデル未保存"
     for sheet in book.sheets:
-        if sheet.name in (SHEET_NAMES["horizontal"],SHEET_NAMES["pressure"],SHEET_NAMES["shaft"],SHAFT_FORCE_SHEET): continue
+        if sheet.name in (*SHEET_NAMES.values(),SHAFT_FORCE_SHEET): continue
         sheet.note(sheet.name, "title")
         sheet.note(state + "　" + report.get("created_at", ""))
         sheet.note("青文字：原値　黄色：変換時の実入力（固定）　数式：再計算値。条件変更時はアプリから再実行してください。")
@@ -1039,43 +1152,6 @@ def build(report):
     source_sheet.note(f"座標演算の保持小数桁: {length_digits}（入力座標の最大精度＋中点の1桁）。積分・補間の結果は途中で丸めません。")
     detail_links = {}
     force_links = {}
-    if "tip" in sheets:
-        sheet = sheets["tip"]
-        rows = report["details"]["tip"]["nodes"]
-        sheet.widths = [8,8,10,17,15,15,15,15,15,15,15,15]
-        sheet.note("SDCの短期K1/K2・押込みFy/Fuを転記。負側制限値F1−/F2−は空欄のまま転記します。")
-        sheet.section("杭先端の結果",["KG","列","先端節点","K1再計算\n(kN/m)","K1実入力\n(kN/m)","K2再計算\n(kN/m)","K2実入力\n(kN/m)","Fy再計算\n(kN)","Fy実入力\n(kN)","Fu再計算\n(kN)","Fu実入力\n(kN)"])
-        summaries = {}
-        for row in rows:
-            ident = row["id"]
-            def actual(field): return Cell(numeric(fixed[ident,field]["after"]),style="actual")
-            r = sheet.add([row["group"],row["column"],row["node"],None,actual(4),None,actual(7),None,actual(5),None,actual(8)])
-            summaries[ident] = r
-            detail_links[ident] = (sheet.name,r,0)
-            for calc,f in ((3,4),(5,7),(7,5),(9,8)):
-                book.expected.append((sheet.name,r,calc,fixed[ident,f]["after"],ident))
-                digits = max(0,-numeric(fixed[ident,f]["after"]).normalize().as_tuple().exponent) if fixed[ident,f]["after"] is not None else 0
-                sheet.rows[r][calc].number_format = '#,##0'+('.'+'0'*digits if digits else '')
-        sheet.section("杭頭・最深節点と杭長",["KG","列","杭頭節点","先端節点","x座標\n(m)","杭頭y\n(m)","先端y\n(m)","座標差\n(m)","SDC杭長\n(m)"])
-        for row in rows:
-            g = row["geometry"]
-            r = sheet.add([row["group"],row["column"],g["head_node"],row["node"],row["x_m"],g["origin_y_m"],row["y_m"],None,row["pile_length_m"]],styles={i:"source" for i in (4,5,6,8)},formats={i:LENGTH for i in range(4,9)})
-            sheet.set_formula(r,7,length(sheet.ref(r,6)-sheet.ref(r,5)))
-            sr = summaries[row["id"]]
-            for c,key,line in ((3,"k1_kN_per_m","spring_line"),(5,"k2_kN_per_m","spring_line"),(7,"fy_kN","force_line"),(9,"fu_kN","force_line")):
-                sheet.set_formula(sr,c,src("tip",row[line],row["source_fields"][key]))
-        for title,offsets in (("ばね実入力 (kN/m)",[4,7,10,11,12,13]),("制限値実入力 (kN)",[5,6,8,9])):
-            labels = [fixed[rows[0]["id"],i]["label"] for i in offsets]
-            sheet.section(title,["KG","列","節点","支点項目",*labels])
-            for row in rows:
-                sheet.add([row["group"],row["column"],row["node"],row["output"]["item"],
-                           *[numeric(fixed[row["id"],i]["after"]) for i in offsets]],styles={i:"actual" for i in range(4,4+len(offsets))})
-        sheet.section("Python Decimalの丸め前文字列",["KG","対象","項目","正確な計算記録"])
-        for row in rows:
-            for label in ("k1_kN_per_m","k2_kN_per_m","fy_kN","fu_kN"):
-                value = row[label]
-                sheet.note(f"KG{row['group']} {row['node']} {label}: {value if value is not None else '保留'}")
-
     source_sheet.section("SDC見出しと原行（文字列保存）",["原行"])
     for row in record["sdc_context"]: source_sheet.note(f"SDC {row['line']}行: {row['raw']}")
     source_sheet.section("NDU幾何の出典",["原行"])
@@ -1094,6 +1170,9 @@ def build(report):
     if "shaft" in sheets:
         build_shaft(book,sheets["shaft"],force_sheet,source_sheet,report["details"]["shaft"],
                     fixed,src,length,detail_links,force_links,config["shaft_k_decimals"],config["shaft_force_decimals"])
+    if "tip" in sheets:
+        build_tip(book,sheets["tip"],source_sheet,report["details"]["tip"]["nodes"],
+                  fixed,src,length,detail_links,force_links)
 
     summary.note("モデル: "+report["sources"][1]["path"])
     summary.note(f"計算対象 {len(record['targets'])}件　変更 {record['counts']['変更']}件　追加 {record['counts']['追加']}件　同値 {record['counts']['同値']}件　保留 {record['counts']['保留']}件")

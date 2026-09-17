@@ -67,10 +67,13 @@ class WorkbookTests(unittest.TestCase):
             self.assertEqual(normal.find('m:scheme',ns).attrib['val'],'none')
             for i in range(1,8):
                 root=ET.fromstring(archive.read(f'xl/worksheets/sheet{i}.xml'))
-                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3,4,5) else 'landscape')
+                self.assertEqual(root.find('m:pageSetup',ns).attrib['orientation'],'portrait' if i in (2,3,4,5,6) else 'landscape')
                 self.assertLessEqual(int(root.find('m:pageSetup',ns).attrib.get('scale','100')),100)
                 if i in (2,3,4,5):
                     self.assertEqual([int(e.get('id')) for e in root.findall('m:colBreaks/m:brk',ns)],[9,18] if i==3 else [7,14])
+                    self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
+                elif i==6:
+                    self.assertIsNone(root.find('m:rowBreaks',ns))
                     self.assertIsNone(root.find('m:sheetViews/m:sheetView/m:pane',ns))
                 else:
                     self.assertIsNotNone(root.find('m:rowBreaks',ns))
