@@ -1,4 +1,4 @@
-"""右SDCの杭周面ばね・支持力をNDUのSuppotInfoへ入力する。
+"""番号列・奇数偶数列形式のSDCの杭周面ばね・支持力をNDUのSuppotInfoへ入力する。
 
 既存画面方式: 押込み側K1を正負の全勾配、Fyを正負の両制限値へ設定する。
 原本は保持。--output省略は確認表示。出力時は--profile existing-screenを明示する。

@@ -69,10 +69,12 @@ def complete(report, sdc_raw, original, result, profiles):
     lines = sdc_raw.decode("cp932").splitlines()
     used_lines = set()
 
-    def source(op, line, column, label, value, unit):
+    def source(op, line, ref, value, unit):
         used_lines.add(line)
-        sources.append(dict(operation=op, line=line, field=column, label=label,
-                            value=str(value), unit=unit, raw=lines[line-1]))
+        if D(lines[line-1].split(",")[ref.field-1].strip()) != D(value):
+            raise base.InputError(f"SDC {line}行{ref.field}欄: 採用値と原CSVの値が一致しません。")
+        sources.append(dict(operation=op, line=line, field=ref.field, label=ref.label,
+                            interpretation=ref.interpretation, value=str(value), unit=unit, raw=lines[line-1]))
 
     for op, profile in profiles.items():
         detail = report["details"][op]
@@ -84,17 +86,16 @@ def complete(report, sdc_raw, original, result, profiles):
             detail["conditions"] = dict(pile_length_m=profile.length, exclusion_m=profile.exclusion,
                                         embedment_m=profile.embedment)
             # 主表は除外区間も含む全層を示す。有効支点のpiecesだけでは先頭層が欠ける。
-            ncols = len(profile.layers[0].values)
             detail["layers"] = []
             for layer in profile.layers:
                 columns = []
                 for col in sorted(set(groups.values())):
                     kv, fv = layer.values[col]
-                    kfield, ffield = 3+2*ncols+col, 3+col
+                    kref, fref = layer.sources[col]
                     columns.append(dict(column=col, k1_kN_per_m2=kv, fy_kN_per_m=fv,
-                                        spring_field=kfield, force_field=ffield))
-                    source(op, layer.spring_line, kfield, "押込み 短期第1勾配 K1", kv, "kN/m²")
-                    source(op, layer.force_line, ffield, "押込み 降伏点 Fy", fv, "kN/m")
+                                        spring_field=kref.field, force_field=fref.field))
+                    source(op, layer.spring_line, kref, kv, "kN/m²")
+                    source(op, layer.force_line, fref, fv, "kN/m")
                 detail["layers"].append(dict(number=layer.number, top_m=layer.top, bottom_m=layer.bottom,
                     active_top_m=layer.active_top, active_bottom_m=layer.active_bottom,
                     spring_thickness_m=D(lines[layer.spring_line-1].split(",")[1].strip()),
@@ -117,20 +118,16 @@ def complete(report, sdc_raw, original, result, profiles):
                     piece.update(layer=layer.number, layer_top_m=layer.top, layer_bottom_m=layer.bottom,
                                  top_m=max(D(geo["top_m"]), layer.top), bottom_m=min(D(geo["bottom_m"]), layer.bottom))
                     if op == "horizontal":
-                        # 同じパーサが選択した見出しからCSV欄の番号を取得する。
-                        header = next(l for l in reversed(lines[:layer.source_line-1]) if "短期(非線形)-" in l)
-                        index = [f.strip() for f in header.split(",")].index(f"短期(非線形)-{col}列目") + 1
-                        piece["value_field"] = index
-                        source(op, layer.source_line, index, f"{col}列目 短期(非線形)", layer.values[col], "kN/m²")
+                        ref = layer.sources[col]
+                        piece["value_field"] = ref.field
+                        source(op, layer.source_line, ref, layer.values[col], "kN/m²")
                     else:
                         upper, lower = layer.values[col]
                         piece.update(layer_upper=upper, layer_lower=lower)
-                        # 土圧パーサと同じ杭列見出しを使う（列の並びを仮定しない）。
-                        header = next(l for l in reversed(lines[:layer.source_line-1]) if "1列目" in l)
-                        index = [f.strip() for f in header.split(",")].index(f"{col}列目") + 1
-                        piece.update(upper_field=index, lower_field=index+1)
-                        source(op, layer.source_line, index, f"{col}列目 上側", upper, "kN/m")
-                        source(op, layer.source_line, index+1, f"{col}列目 下側", lower, "kN/m")
+                        uref, lref = layer.sources[col]
+                        piece.update(upper_field=uref.field, lower_field=lref.field)
+                        source(op, layer.source_line, uref, upper, "kN/m")
+                        source(op, layer.source_line, lref, lower, "kN/m")
                 key = f"JibanShogenInfo{number}"
                 offsets = [2] if op == "horizontal" else [3, 4]
                 expected = [row["value"]] if op == "horizontal" else row["calculated"]
@@ -142,23 +139,22 @@ def complete(report, sdc_raw, original, result, profiles):
                 added = False
             else:
                 if op == "shaft":
-                    ncols = len(profile.layers[0].values)
                     for piece in row["pieces"]:
                         layer = layer_map[piece["layer"]]
+                        kref, fref = layer.sources[row["column"]]
                         piece.update(layer_top_m=layer.top, layer_bottom_m=layer.bottom,
                                      active_top_m=layer.active_top, active_bottom_m=layer.active_bottom,
-                                     spring_field=3+2*ncols+row["column"], force_field=3+row["column"])
-                        source(op, layer.spring_line, 3+2*ncols+row["column"], "押込み 短期第1勾配 K1", piece["k1_kN_per_m2"], "kN/m²")
-                        source(op, layer.force_line, 3+row["column"], "押込み 降伏点 Fy", piece["fy_kN_per_m"], "kN/m")
+                                     spring_field=kref.field, force_field=fref.field)
+                        source(op, layer.spring_line, kref, piece["k1_kN_per_m2"], "kN/m²")
+                        source(op, layer.force_line, fref, piece["fy_kN_per_m"], "kN/m")
                 else:
-                    ncols, col = len(profile.values), row["column"]
-                    row["source_fields"] = dict(k1_kN_per_m=ncols+col, k2_kN_per_m=2*ncols+col, fy_kN=col, fu_kN=ncols+col)
-                    for line_no, index, label, value, unit in (
-                        (profile.spring_line, ncols+col, "短期K1", row["k1_kN_per_m"], "kN/m"),
-                        (profile.spring_line, 2*ncols+col, "短期K2", row["k2_kN_per_m"], "kN/m"),
-                        (profile.force_line, col, "押込みFy", row["fy_kN"], "kN"),
-                        (profile.force_line, ncols+col, "押込みFu", row["fu_kN"], "kN")):
-                        source(op, line_no, index, label, value, unit)
+                    refs = profile.sources[row["column"]]
+                    row["source_fields"] = {key: ref.field for key, ref in refs.items()}
+                    detail["interpretation"] = profile.interpretation
+                    for key, ref in refs.items():
+                        spring = key in ("k1_kN_per_m", "k2_kN_per_m")
+                        source(op, profile.spring_line if spring else profile.force_line,
+                               ref, row[key], "kN/m" if spring else "kN")
                 final = new_supports[number]
                 key, line, item = final["key"], final["line"], final["item"]
                 offsets, labels = list(range(4, 14)), list(support.FIELD_NAMES[3:])

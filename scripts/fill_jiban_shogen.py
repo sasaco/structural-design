@@ -1,4 +1,4 @@
-"""今町橋4Pの右SDCから、NDUの水平地盤ばね値を入力する。
+"""番号列・奇数偶数列形式のSDCから、NDUの水平地盤ばね値を入力する。
 
 標準ライブラリのみを使用。CP932の入力を読み、変更箇所以外のバイトを保持する。
 """
@@ -286,7 +286,7 @@ def write_with_backup(path: Path, expected: bytes, result: bytes) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--sdc", type=Path, default=DEFAULT_SDC, help="右基礎のSDC（既定: test内）")
+    parser.add_argument("--sdc", type=Path, default=DEFAULT_SDC, help="参照SDC（既定: test内の右基礎）")
     parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力先NDU（既定: test内）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:列", help="KG番号:SDC杭列番号（既定: 4:1 5:2 6:3）")
     parser.add_argument("--cross-layer", choices=["error", "length-weighted", "midpoint", "skip"], default="length-weighted",

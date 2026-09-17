@@ -1,4 +1,4 @@
-"""右SDCの杭先端ばね・支持力をNDUのSuppotInfoへ入力する。
+"""番号列・奇数偶数列形式のSDCの杭先端ばね・支持力をNDUのSuppotInfoへ入力する。
 
 指定snapモデルの配置: K1±=短期第1勾配、K2±=K3±=短期第2勾配、
 F1+=降伏、F2+=終局、負側制限値は空欄。長さ換算・周面抵抗の合成なし。
@@ -163,6 +163,8 @@ def make_plan(ndu: base.Ndu, profile: Profile, groups: dict[int, int]):
                      "y_m": y, "pile_length_m": profile.length,
                      "spring_line": profile.spring_line, "force_line": profile.force_line,
                      "k1_kN_per_m": v.k1, "k2_kN_per_m": v.k2, "fy_kN": v.fy, "fu_kN": v.fu,
+                     "interpretation": profile.interpretation,
+                     "source_columns": {name: vars(ref) for name,ref in profile.sources.get(col,{}).items()},
                      "field4_to_13": updates[node]})
     if not updates:
         raise InputError("入力対象の杭先端がありません")

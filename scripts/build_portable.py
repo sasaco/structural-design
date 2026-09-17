@@ -59,7 +59,7 @@ def main():
             shutil.copyfile(xlsxwriter.locate_file(item), licenses / ("XlsxWriter-" + Path(item).name))
     source_files = [ROOT / "scripts" / name for name in (
         "sdc_converter_app.py", "model_preview.py", "kg_candidates.py", "kg_selection.py", "excel_preview.py", "excel_report.py", "excel_cli.py",
-        "calculation_record.py", "portable_converter.py", "portable_smoke.py", "fill_jiban_shogen.py",
+        "calculation_record.py", "sdc_columns.py", "portable_converter.py", "portable_smoke.py", "fill_jiban_shogen.py",
         "fill_jiban_pressure.py", "fill_suppot_info.py", "fill_pile_tip_suppot_info.py", "build_portable.py")]
     source_files += [ROOT / "requirements.txt", ROOT / "requirements-build.txt", ROOT / "docs/SDCConverter-README.txt"]
     source_files += sorted(path for path in (ROOT / "docs/licenses").rglob("*") if path.is_file())
@@ -96,6 +96,15 @@ def main():
     result = json.loads(smoke_report.read_text(encoding="utf-8"))
     if not result.get("ok") or not result.get("frozen"):
         raise RuntimeError(f"Packaged test failed; see {smoke_report}")
+    left_smoke = session / "packaged-smoke-left.json"
+    run([extracted / APP_NAME / f"{APP_NAME}.exe", "--self-test", left_smoke,
+         "--sdc", ROOT / "snap/今町橋りょう4P(左).sdc",
+         "--ndu", ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu",
+         "--self-test-groups", "1", "2", "3"],
+        cwd=extracted, env=environment, timeout=90)
+    left_result = json.loads(left_smoke.read_text(encoding="utf-8"))
+    if not left_result.get("ok") or not left_result.get("frozen"):
+        raise RuntimeError(f"Packaged left SDC test failed; see {left_smoke}")
     # テスト済みのZIPだけを公開する。既存成果物は成功時に置換する。
     destination = ROOT / "dist" / name
     staging = ROOT / "dist" / (name + ".tmp")
@@ -104,6 +113,7 @@ def main():
     checksum = hashlib.sha256(destination.read_bytes()).hexdigest()
     destination.with_suffix(".zip.sha256").write_text(f"{checksum}  {name}\n", encoding="ascii")
     shutil.copyfile(smoke_report, ROOT / "dist" / "packaged-smoke.json")
+    shutil.copyfile(left_smoke, ROOT / "dist" / "packaged-smoke-left.json")
     print(f"ZIP: {destination}")
     print(f"SHA256: {checksum}")
     print(f"Verified application: {extracted / APP_NAME / (APP_NAME + '.exe')}")

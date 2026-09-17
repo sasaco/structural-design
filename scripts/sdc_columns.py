@@ -62,9 +62,11 @@ def resolve(labels, count=None, *, pressure=False, ordered=False, context="SDC")
     if labels == expected:
         if count is None:
             raise InputError(f"{context}: 奇数列・偶数列形式には杭配置条件の杭列数が必要です。")
-        indices = {col: (col-1 if pressure and col <= 2 else
-                         (2 if col % 2 else 3) if pressure else (col-1) % 2)
-                   for col in range(1, count+1)}
+        if pressure:
+            indices = {col: col-1 if col <= 2 else (2 if col % 2 else 3)
+                       for col in range(1, count+1)}
+        else:
+            indices = {col: (col-1) % 2 for col in range(1, count+1)}
         return ColumnLayout(labels, indices, "pressure-parity" if pressure else "parity")
     indices = {}
     for index, label in enumerate(labels):

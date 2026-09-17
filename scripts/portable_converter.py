@@ -20,7 +20,7 @@ import calculation_record
 import excel_report
 from kg_candidates import inspect_candidates, validate_groups
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 APP_NAME = "SDCConverter"
 InputError = base.InputError
 OPERATIONS = {

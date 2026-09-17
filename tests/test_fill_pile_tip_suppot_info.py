@@ -39,6 +39,7 @@ def plan(raw=None, sdc=None, groups=None):
                          app.parse_sdc(sdc if sdc is not None else sdc_bytes()), groups or {4: 1})
 
 
+class ParserTests(unittest.TestCase):
     def test_selects_short_term_in_transverse_direction_without_rounding(self):
         profile = app.parse_sdc(sdc_bytes())
         self.assertEqual(profile.length, D(3))

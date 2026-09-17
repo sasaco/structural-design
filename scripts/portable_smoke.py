@@ -32,7 +32,11 @@ def self_test(args, app_class):
             originals = {p: p.read_bytes() for p in (args.sdc, args.ndu) if p}
             with tempfile.TemporaryDirectory(prefix="SDCConverter-日本語 ") as folder:
                 destination = Path(folder)
-                request = converter.Request(args.sdc, args.ndu, shaft_profile="existing-screen")
+                selected = tuple(args.self_test_groups)
+                groups = tuple(f"{g}:{i}" for i,g in enumerate(selected,1))
+                ndu = converter.base.parse_ndu(originals[args.ndu])
+                members = {g: {m.number for m in converter.base.collect_members(ndu,{g:1})} for g in selected}
+                request = converter.Request(args.sdc, args.ndu, groups=groups, shaft_profile="existing-screen")
                 plan = converter.prepare(request)
                 output = destination / "変換 結果.ndu"
                 saved = converter.save(plan, output)
@@ -40,7 +44,7 @@ def self_test(args, app_class):
                 audit = json.loads(saved.report.read_text(encoding="utf-8"))
                 assert audit["output_sha256"] == converter.digest(output.read_bytes())
                 rerun = converter.Request(args.sdc, output, operations=request.operations,
-                                          shaft_profile="existing-screen")
+                                          groups=groups, shaft_profile="existing-screen")
                 repeated = converter.prepare(rerun)
                 assert repeated.data == plan.data
                 replaced = converter.save(repeated, output, overwrite=True)
@@ -63,29 +67,34 @@ def self_test(args, app_class):
                 assert selector.ready, selector.message.get()
                 assert set(selector.rows) == set(range(1, 7))
                 assert not view.selected
-                for group in (4, 5, 6):
+                for group in selected:
                     selector.rows[group].check.invoke()
-                assert selector.selection() == converter.DEFAULT_GROUPS
-                expected = set(range(98, 122)) | set(range(123, 147)) | set(range(148, 172))
+                assert selector.selection() == groups
+                expected = set.union(*members.values())
                 assert view.selected == expected
-                assert len(view.canvas.find_withtag("selected")) == 72
-                for group in (4, 6):
+                assert len(view.canvas.find_withtag("selected")) == len(expected)
+                for group in (selected[0], selected[2]):
                     selector.rows[group].check.invoke()
-                assert view.selected == set(range(123, 147))
-                assert view.canvas.itemcget("element:123", "fill") == "#dc2626"
-                assert view.canvas.itemcget("element:98", "fill") == "#475569"
-                selector.rows[5].check.invoke()
+                assert view.selected == members[selected[1]]
+                assert view.canvas.itemcget(f"element:{min(members[selected[1]])}", "fill") == "#dc2626"
+                assert view.canvas.itemcget(f"element:{min(members[selected[0]])}", "fill") == "#475569"
+                selector.rows[selected[1]].check.invoke()
                 assert not view.selected and not view.canvas.find_withtag("selected")
                 for row in selector.rows.values():
                     row.column.set("")
-                for group in (4, 5, 6):
+                for group in selected:
                     selector.rows[group].check.invoke()
                 assert view.selected == expected
                 report["checks"].append({"model-preview": "live-kg-highlighting", "elements": len(view.model.elements),
                                          "selected": len(view.selected)})
                 # 短いKG候補はEXEでも無効。処理ロック解除後にも復活しない。
                 shorter = destination / "杭長不一致.ndu"
-                shorter.write_bytes(args.ndu.read_bytes().replace(b"KGInfo4=21,98,121", b"KGInfo4=21,98,120"))
+                shortened = list(ndu.lines)
+                index = ndu.records[f"KGInfo{selected[0]}"][0]
+                fields = shortened[index].rstrip(b"\r\n").split(b",")
+                fields[2] = str(int(fields[2])-1).encode("ascii")
+                shortened[index] = b",".join(fields)+b"\r\n"
+                shorter.write_bytes(b"".join(shortened))
                 app.paths["ndu"].set(str(shorter))
                 assert not app.groups.get() and not selector.ready
                 deadline = time.monotonic() + 15
@@ -93,7 +102,7 @@ def self_test(args, app_class):
                     root.update()
                     time.sleep(0.01)
                 assert selector.ready, selector.message.get()
-                row = selector.rows[4]
+                row = selector.rows[selected[0]]
                 assert not row.candidate.enabled
                 app.apply_states()
                 row.check.invoke()
@@ -106,19 +115,24 @@ def self_test(args, app_class):
                     root.update()
                     time.sleep(0.01)
                 assert selector.ready, selector.message.get()
-                for group in (4, 5, 6):
+                for group in selected:
                     selector.rows[group].check.invoke()
                 # 通常ボタンで列を変更し、5杭でもSDC3列目を共用できる。
-                for group in (2, 3):
+                extra = [g for g in selector.rows if g not in selected][:2]
+                for group in extra:
                     selector.rows[group].check.invoke()
+                five = sorted((*selected,*extra),key=lambda g: (selector.rows[g].candidate.x,g))
+                def assigned(direction):
+                    mapping = {g:min(i,3) for i,g in enumerate(five if direction=="left" else five[::-1],1)}
+                    return tuple(f"{g}:{mapping[g]}" for g in sorted(mapping))
                 selector.direction_buttons["right"].invoke()
-                assert selector.selection() == ("2:3", "3:3", "4:3", "5:2", "6:1")
+                assert selector.selection() == assigned("right")
                 selector.direction_buttons["left"].invoke()
-                assert selector.selection() == ("2:1", "3:2", "4:3", "5:3", "6:3")
-                for group in (2, 3):
+                assert selector.selection() == assigned("left")
+                for group in extra:
                     selector.rows[group].check.invoke()
                 selector.direction_buttons["right"].invoke()
-                assert selector.selection() == ("4:3", "5:2", "6:1")
+                assert selector.selection() == tuple(f"{g}:{3-i}" for i,g in enumerate(selected))
                 assert app.request().push_direction == "direct"
                 expected_plan = converter.prepare(app.request())
                 assert all(row["pressure_column"] == row["column"]

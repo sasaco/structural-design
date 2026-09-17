@@ -5,7 +5,7 @@
 
 ## 利用と対応範囲
 
-配布ZIP: `dist/SDCConverter-v1.2.0-win-x64.zip`。
+配布ZIP: `dist/SDCConverter-v1.3.0-win-x64.zip`。
 展開した `SDCConverter/SDCConverter.exe` を実行する。
 Python・pip・Visual Studio・Excelは利用者PCに不要。
 EXEと `_internal` は同じフォルダーに置く。
@@ -24,6 +24,10 @@ GUIでは杭対応・対象項目を選択可能。「右押し」「左押し�
 GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="existing-screen"` を渡す。
 先端との合成等の既存制限も継承する。
 
+2026-09-18、番号列形式と奇数列・偶数列形式のSDCに対応。左SDCも4項目・JSON・Excelで使用できる。
+実杭列数まで展開し、GUIでは1列目からの番号を指定する。元CSV欄と解釈種別はパーサーが保持する。
+詳しくは [左SDC対応計画](left-sdc-support-plan.md) と [実装・検証記録](left-sdc-support-implementation.md)。
+
 ## ソース構成
 
 - `scripts/sdc_converter_app.py`: GUI、ファイル選択、Excelプレビュー、バックグラウンド実行、関連付けアプリで開く。
@@ -32,6 +36,7 @@ GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="
 - `scripts/kg_candidates.py`: KGInfoの列挙、SDC地層厚合計と部材長合計の照合。
 - `scripts/kg_selection.py`: KGInfoチェックリスト、SDCモデル列の選択、候補のバックグラウンド再読込。
 - `scripts/portable_converter.py`: `Request` → `prepare()` → `Plan` → `save()`。GUI非依存。
+- `scripts/sdc_columns.py`: 実杭列数、番号列・奇偶列・土圧区分、原CSV欄の共通処理。
 - `scripts/portable_smoke.py`: Python / EXE共用の起動・実データ変換検証。
 - `scripts/build_portable.py`: 既存を含むテスト、ビルド、ZIP展開、EXE検証、配布ZIPとSHA-256出力。
 - `requirements.txt`: Excel生成用XlsxWriter 3.2.9。`requirements-build.txt` はこれとビルド依存を固定。
@@ -155,7 +160,7 @@ py -3.12 -m venv .venv
 `.venv-build/Scripts/python.exe` で `scripts/build_portable.py` を実行する。
 テスト、EXEビルド、ZIP展開後の検証が順に実行され、ログは統合ターミナルに表示される。
 子プロセスのテストやPyInstallerにデバッガーが自動接続しないよう `subProcess: false` を指定する。
-成功すると `dist/SDCConverter-v1.2.0-win-x64.zip` と `.zip.sha256`、`packaged-smoke.json` が生成される。
+成功すると `dist/SDCConverter-v1.3.0-win-x64.zip` と `.zip.sha256`、右の `packaged-smoke.json`、左の `packaged-smoke-left.json` が生成される。
 GUIを起動したい場合は、構成を **SDC Converter: GUI** に切り替える。
 
 ### 初回セットアップとターミナルからのビルド

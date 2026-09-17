@@ -105,7 +105,7 @@ class App:
         self.group_selector = KGSelection(settings, self.paths["ndu"], self.paths["sdc"], self.groups)
         self.group_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
         ttk.Label(settings, style="Hint.TLabel",
-                  text="対応：右基礎SDCの直角方向・短期。指定したSDC列を各項目に使用します。\n"
+                  text="対応：SDCの番号列・奇数／偶数列形式（直角方向・短期）。指定したSDC列を各項目に使用します。\n"
                        "周面は既存画面方式（押込みK1を正負の全勾配、Fyを正負の両制限値に設定）。",
                   justify="left", wraplength=570).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
         destination = ttk.LabelFrame(form, text="3  保存先", padding=12)
@@ -308,6 +308,8 @@ def main():
     parser.add_argument("--self-test", type=Path, help="配布検証レポートの保存先")
     parser.add_argument("--sdc", type=Path)
     parser.add_argument("--ndu", type=Path)
+    parser.add_argument("--self-test-groups", type=int, nargs=3, default=(4, 5, 6),
+                        metavar="KG", help="配布検証の対象KG（左から3本。既定: 4 5 6）")
     args = parser.parse_args()
     if args.self_test:
         from portable_smoke import self_test
