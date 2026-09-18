@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{7ca4a0db-2229-4b5f-9915-d0656f319e71}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>sdc_converter_app.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>Global|VisualStudio|.venv</InterpreterId>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="analyze_suppot_info.py" />
+    <Compile Include="build_portable.py" />
+    <Compile Include="calculation_record.py" />
+    <Compile Include="excel_cli.py" />
+    <Compile Include="excel_preview.py" />
+    <Compile Include="excel_report.py" />
+    <Compile Include="fill_jiban_pressure.py" />
+    <Compile Include="fill_jiban_shogen.py" />
+    <Compile Include="fill_pile_tip_suppot_info.py" />
+    <Compile Include="fill_suppot_info.py" />
+    <Compile Include="kg_candidates.py" />
+    <Compile Include="kg_selection.py" />
+    <Compile Include="model_preview.py" />
+    <Compile Include="portable_converter.py" />
+    <Compile Include="portable_smoke.py" />
+    <Compile Include="sdc_columns.py" />
+    <Compile Include="sdc_converter_app.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|VisualStudio|.venv" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
