@@ -424,7 +424,7 @@ def verify_xlsx(data, book):
 def numeric(value): return D(str(value)) if value is not None and str(value).strip() else None
 
 
-def build_horizontal(book, sheet, rows, fixed, src):
+def build_horizontal(book, sheet, rows, fixed, src, direction_label):
     """部材×地層の7列表。原値・長さを主表に置き、採用値は内部で照合する。"""
     groups = sorted({(row["column"], row["group"]) for row in rows})
     blocks = [sorted((row for row in rows if row["group"]==group),
@@ -459,6 +459,7 @@ def build_horizontal(book, sheet, rows, fixed, src):
         if special:
             title += "（"+"・".join(METHODS[m] for m in sorted(special))+"）"
         put(0,c,title,align="left",borders="").style = "spring_title"
+        put(0,c+1,direction_label,align="left",borders="").style = "spring_title"
         for j,h in enumerate(headers): put(1,c+j,h)
         sheet.column_merges[1,c+3] = c+4
         r, previous_layer = 2, None
@@ -528,7 +529,7 @@ def build_horizontal(book, sheet, rows, fixed, src):
         start = end
 
 
-def build_pressure(book, sheet, rows, fixed, src, decimals):
+def build_pressure(book, sheet, rows, fixed, src, decimals, selection_label):
     """土圧の9列表。区間の上下端を2行に分け、部材単位で採用値を示す。"""
     groups = sorted({(row["column"],row["group"]) for row in rows})
     blocks = [sorted((row for row in rows if row["group"]==g),
@@ -565,6 +566,7 @@ def build_pressure(book, sheet, rows, fixed, src, decimals):
         sheet.sections.append((f"KG{first_row['group']} / モデル{first_row['column']}列目 / 土圧SDC{first_row['pressure_column']}列目",0,c))
         title = "有効抵抗土圧" + ("（上下端採用）" if any(row["method"]=="endpoints" for row in block) else "")
         put(0,c,title,align="left",borders="").style = "pressure_title"
+        put(0,c+1,selection_label,align="left",borders="").style = "pressure_title"
         for j,h in enumerate(headers): put(1,c+j,h)
         sheet.column_merges[1,c+3] = c+4
         # 層の上下原値セルは、部材との重なり配置を先に走査して決定する。
@@ -654,7 +656,7 @@ def build_pressure(book, sheet, rows, fixed, src, decimals):
                 merge(first,last-1,col)
 
 
-def build_shaft(book, spring, force, detail, fixed, src, length, k_digits, f_digits):
+def build_shaft(book, spring, force, detail, fixed, src, length, k_digits, f_digits, direction_label):
     """全節点の負担幅を地層・除外境界で区切り、同じ配置でKとFを表示する。"""
     geometries = {row["node"]: row["geometry"] for row in detail["nodes"]}
     geometries.update({row["node"]: row for row in detail["excluded"]})
@@ -711,6 +713,7 @@ def build_shaft(book, spring, force, detail, fixed, src, length, k_digits, f_dig
             c = 7*index
             sheet.sections.append((f"KG{group} / SDC{col}列目",0,c))
             put(0,c,"鉛直せん断地盤ばね定数" if kind=="k" else "杭周面の支持力",align="left",borders="").style="shaft_title"
+            put(0,c+1,direction_label,align="left",borders="").style="shaft_title"
             for j,h in enumerate(headers): put(1,c+j,h)
             sheet.column_merges[1,c+3] = c+4
             r,previous_layer,previous_segment = 2,None,None
@@ -797,7 +800,7 @@ def build_shaft(book, spring, force, detail, fixed, src, length, k_digits, f_dig
             book.expected.append(Check(fn("ROUND",main_refs[kind,node],digits),fixed[ident,field]["after"],ident+":"+kind))
 
 
-def build_tip(book, sheet, rows, fixed, src, length):
+def build_tip(book, sheet, rows, fixed, src, length, direction_label):
     """先端のK/F原値を3列の上下2表へ直接置き、幾何と採用値は内部で照合する。"""
     sheet.layout, sheet.freeze, sheet.print_scale = "tip", (0,0), 100
     sheet.widths = [9,24.375,24.375]
@@ -833,7 +836,8 @@ def build_tip(book, sheet, rows, fixed, src, length):
         used = 0
 
     def heading(title, unit_title, labels, continued=False):
-        r = add([cell(title+("（続き）" if continued else ""),style="tip_title",align="left"),cell(),cell()])
+        r = add([cell(title+("（続き）" if continued else ""),style="tip_title",align="left"),
+                 cell(),cell(direction_label,style="tip_title",align="right")])
         if not continued: sheet.sections.append((title,r,0))
         add([cell("節点番号",style="tip_header",borders="LRTB"),
              cell(unit_title,style="tip_header",borders="LRTB"),cell()],header_height)
@@ -887,6 +891,8 @@ def build(report):
         "SDCConverter.Mode":report.get("mode","preview"),
         "SDCConverter.Status":"モデル保存と同一実行" if report.get("mode")=="saved" else "計算確認・モデル未保存",
         "SDCConverter.OutputSHA256":report["output_sha256"],
+        "SDCConverter.SDCDirection":config["sdc_direction_label"],
+        "SDCConverter.PressureCase":config.get("pressure_case_label") or "not-used",
     })
     source_values = {(v["operation"],v["line"],v["field"]):numeric(v["value"]) for v in record["source_values"]}
 
@@ -908,13 +914,17 @@ def build(report):
     length_digits = max([3]+[-v.as_tuple().exponent for v in length_values]) + 1
     def length(expr): return fn("ROUND",expr,length_digits)
     if "horizontal" in sheets:
-        build_horizontal(book,sheets["horizontal"],report["details"]["horizontal"]["members"],fixed,src)
+        build_horizontal(book,sheets["horizontal"],report["details"]["horizontal"]["members"],fixed,src,
+                         config["sdc_direction_label"])
     if "pressure" in sheets:
-        build_pressure(book,sheets["pressure"],report["details"]["pressure"]["members"],fixed,src,config["pressure_decimals"])
+        build_pressure(book,sheets["pressure"],report["details"]["pressure"]["members"],fixed,src,
+                       config["pressure_decimals"],
+                       config["sdc_direction_label"]+"・"+config["pressure_case_label"].removeprefix("・"))
     if "shaft" in sheets:
         build_shaft(book,sheets["shaft"],force_sheet,report["details"]["shaft"],fixed,src,length,
-                    config["shaft_k_decimals"],config["shaft_force_decimals"])
+                    config["shaft_k_decimals"],config["shaft_force_decimals"],config["sdc_direction_label"])
     if "tip" in sheets:
-        build_tip(book,sheets["tip"],report["details"]["tip"]["nodes"],fixed,src,length)
+        build_tip(book,sheets["tip"],report["details"]["tip"]["nodes"],fixed,src,length,
+                  config["sdc_direction_label"])
     book.recalculate()
     return book

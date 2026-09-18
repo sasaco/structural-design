@@ -13,7 +13,7 @@
 
 2026-09-17のユーザー指定に基づき、既定では `KGInfo4`（98～121）にSDCの1列目、`KGInfo5`（123～146）に2列目、`KGInfo6`（148～171）に3列目を対応させる。合計72部材。部材範囲は実行時に `KGInfo` から読む。
 
-SDCの「（２）直角方向 → b）水平地盤ばね値 → 短期(非線形)-N列目」を使用し、NDUの `JibanShogenInfo` の第2フィールドに入力する。他のフィールド・対象外の部材・文字コード・改行は元のバイトを保持する。
+SDCの選択方向にある「b）水平地盤ばね値 → 短期(非線形)-N列目」を使用し、NDUの `JibanShogenInfo` の第2フィールドに入力する。他のフィールド・対象外の部材・文字コード・改行は元のバイトを保持する。`--sdc-direction longitudinal` で橋軸方向、`transverse` で直角方向を選ぶ。既定は `transverse`。
 
 2026-09-18、`短期(非線形)-奇数列/偶数列` にも対応。杭配置条件の実杭列数まで展開し、元CSV欄は `Layer.sources` に保持する。今町橋4Pの左SDCを左基礎へ入力する場合は `--sdc` と `--groups 1:1 2:2 3:3` を明示する。計算・丸め方式は共通。
 
@@ -72,7 +72,11 @@ PowerShellでリポジトリ直下から実行する。パスの既定値はス�
 .venv\Scripts\python.exe scripts\fill_jiban_shogen.py --groups 4:1 5:2 6:3 --cross-layer length-weighted
 ```
 
-`--sdc "パス"` と `--ndu "パス"` でファイルも変更できる。
+`--sdc "パス"` と `--ndu "パス"` でファイルも変更できる。橋軸方向を使う例:
+
+```powershell
+.venv\Scripts\python.exe scripts\fill_jiban_shogen.py --sdc-direction longitudinal --groups 4:1 5:2 6:3
+```
 
 ## 検証
 

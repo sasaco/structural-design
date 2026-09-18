@@ -5,7 +5,7 @@
 
 ## 利用と対応範囲
 
-配布ZIP: `dist/SDCConverter-v1.3.0-win-x64.zip`。
+配布ZIP: `dist/SDCConverter-v1.4.0-win-x64.zip`。
 展開した `SDCConverter/SDCConverter.exe` を実行する。
 Python・pip・Visual Studio・Excelは利用者PCに不要。
 EXEと `_internal` は同じフォルダーに置く。
@@ -20,7 +20,9 @@ EXEと `_internal` は同じフォルダーに置く。
 | 杭周面ばね・支持力 | ○ | `fill_suppot_info` |
 | 杭先端ばね・支持力 | ○ | `fill_pile_tip_suppot_info` |
 
-GUIでは杭対応・対象項目を選択可能。「右押し」「左押し」は杭対応の一括設定ボタン。
+GUIでは杭対応・対象項目に加え、SDC参照方向（橋軸／直角）と有効抵抗土圧力の区分
+（応答変位法以外／応答変位法）を選択可能。「右押し」「左押し」は杭対応の一括設定ボタン。
+方向は4項目すべて、応答変位法区分は土圧だけに適用する。既定は直角方向・応答変位法以外。
 GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="existing-screen"` を渡す。
 先端との合成等の既存制限も継承する。
 
@@ -36,7 +38,7 @@ GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="
 - `scripts/kg_candidates.py`: KGInfoの列挙、SDC地層厚合計と部材長合計の照合。
 - `scripts/kg_selection.py`: KGInfoチェックリスト、SDCモデル列の選択、候補のバックグラウンド再読込。
 - `scripts/portable_converter.py`: `Request` → `prepare()` → `Plan` → `save()`。GUI非依存。
-- `scripts/sdc_columns.py`: 実杭列数、番号列・奇偶列・土圧区分、原CSV欄の共通処理。
+- `scripts/sdc_columns.py`: 参照方向・土圧区分、実杭列数、番号列・奇偶列、原CSV欄の共通処理。
 - `scripts/portable_smoke.py`: Python / EXE共用の起動・実データ変換検証。
 - `scripts/build_portable.py`: 既存を含むテスト、ビルド、ZIP展開、EXE検証、配布ZIPとSHA-256出力。
 - `requirements.txt`: Excel生成用XlsxWriter 3.2.9。`requirements-build.txt` はこれとビルド依存を固定。
@@ -51,14 +53,16 @@ KG番号のテキスト入力を廃止し、入力NDU内の全 `KGInfo` を番�
 2026-09-17、ユーザーが対象拡張子は現行の `.ndu` でよいと確認済み。
 各行にはKG番号、開始～終了部材、部材長合計、SDCモデル列、選択不可の理由を表示する。
 初期状態は全件未選択。チェックするとSDC列を仮設定し、コンボボックスで列を変更できる。
-未使用の1～3列を優先し、使い切った場合は利用できる1～3列の最後の列を仮設定する。
+未使用の選択可能列を小さい順に優先し、使い切った場合は選択方向の最大列を仮設定する。
 列の未選択、KG未選択、同じKGの重複、存在しないSDC列は処理を開始しない。
 2026-09-18のユーザー指定により、SDC列と杭x座標の昇順制約、およびSDC列の重複禁止を廃止。
 SDCモデル列は全4項目で参照するSDC列を直接指定する。逆順・同一列の共用を許可する。
 
 「右押し」「左押し」は状態を保持する切替ではなく、選択済みKGの列を一括設定するボタン。
-選択杭をx座標の昇順（同じxならKG番号順）に並べ、左押しは `min(左からの順位,3)`、
-右押しは `min(右からの順位,3)` を割り当てる。5杭ではそれぞれ `1,2,3,3,3` / `3,3,3,2,1`。
+選択杭をx座標の昇順（同じxならKG番号順）に並べ、左押しは
+`min(左からの順位, 選択方向の最大列)`、右押しは `min(右からの順位, 選択方向の最大列)` を割り当てる。
+5列・5杭ではそれぞれ `1,2,3,4,5` / `5,4,3,2,1`、3列・5杭では従来どおり
+`1,2,3,3,3` / `3,3,3,2,1`。
 KG番号順やチェック順には依存しない。1杭は両方1列、2杭は1・2／2・1。
 未選択・読込中・処理中はボタンを無効化。必要なSDC列がない場合は設定せず不足を通知する。
 一括設定後の手動変更や同一列の共用を保持し、チェック変更で再割当しない。
@@ -67,7 +71,7 @@ GUIは `Request(push_direction="direct")` を渡し、土圧の計算時に列�
 既存CLI/APIの `right` / `left` と既定値は互換用に保持する。CLIでGUIと同じ直接列指定を使う場合は
 `fill_jiban_pressure.py --groups 4:3 5:2 6:1 --push-direction direct` を指定する。
 
-地層厚は [水平地盤ばねの仕様](fill-jiban-shogen-script.md) と同じSDC直角方向の
+地層厚は [水平地盤ばねの仕様](fill-jiban-shogen-script.md) と同じSDC選択方向の
 `b）水平地盤ばね値` 表から取得し、全層の厚さを合計する。
 部材長はKGInfoの開始～終了部材と `ElementInfo` 第5・6フィールドの端節点、
 `JointXY` の座標から取得する。既存と同じ鉛直杭の条件で各部材長を合計し、
@@ -160,7 +164,7 @@ py -3.12 -m venv .venv
 `.venv-build/Scripts/python.exe` で `scripts/build_portable.py` を実行する。
 テスト、EXEビルド、ZIP展開後の検証が順に実行され、ログは統合ターミナルに表示される。
 子プロセスのテストやPyInstallerにデバッガーが自動接続しないよう `subProcess: false` を指定する。
-成功すると `dist/SDCConverter-v1.3.0-win-x64.zip` と `.zip.sha256`、右の `packaged-smoke.json`、左の `packaged-smoke-left.json` が生成される。
+成功すると `dist/SDCConverter-v1.4.0-win-x64.zip` と `.zip.sha256`、右の `packaged-smoke.json`、左の `packaged-smoke-left.json` が生成される。
 GUIを起動したい場合は、構成を **SDC Converter: GUI** に切り替える。
 
 ### 初回セットアップとターミナルからのビルド
@@ -221,6 +225,8 @@ PyInstallerの方式は [公式動作説明](https://pyinstaller.org/en/stable/o
 作業フォルダーでEXEを起動する。Tkinter、CP932、実モデルNDUの4項目207件、
 再実行の同一性、バックアップ、入力原本不変を検証。
 GUIのワーカー・イベントキューを通る「Excelをプレビュー→変換して保存」も検証。
+既定の直角方向・応答変位法以外に加え、橋軸方向・応答変位法の4項目一括変換と、
+方向変更による3列／5列の候補再読込をPython版・展開後EXEで検証する。
 EXEでもモデル図171部材の読込・KG4/5/6のチェックによる72部材の赤色表示・選択解除、
 長さ不一致候補のチェック無効化、入力の選び直しを検証。
 検証レポートは `dist/packaged-smoke.json`。実画面でも起動・日本語表示・実行ボタンの配置を確認する。

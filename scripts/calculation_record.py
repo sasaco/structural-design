@@ -7,6 +7,7 @@ import re
 
 import fill_jiban_shogen as base
 import fill_suppot_info as support
+import sdc_columns
 
 SCHEMA_VERSION = 1
 
@@ -191,11 +192,12 @@ def complete(report, sdc_raw, original, result, profiles):
     for i, line in enumerate(lines):
         if line.startswith("杭長,突出長,根入れ深さ,"):
             context_lines.update((i+1, i+2))
-        if line.strip() == "（２）直角方向":
-            direction = i
+    direction, direction_end = sdc_columns.direction_range(
+        lines, report["configuration"]["sdc_direction"])
+    context_lines.add(direction + 1)
     if "shaft" in profiles or "tip" in profiles:
-        for i in range(direction, len(lines)):
-            if lines[i].strip() == "杭列数,奥行き本数,,1/β(m)":
+        for i in range(direction, direction_end):
+            if sdc_columns.is_pile_count_header(lines[i]):
                 context_lines.update((i+1, i+2, i+3))
                 break
     ndu_keys = {f"KGInfo{g}" for g in groups} | {f"ElementInfo{m}" for m in members} | {f"JointXY{n}" for n in nodes}

@@ -25,6 +25,8 @@ def self_test(args, app_class):
         assert set(app.paths) == {"sdc", "ndu", "output"}
         assert all(str(button["state"]) == "normal" for button in app.operation_buttons.values())
         assert all(variable.get() for variable in app.operations.values())
+        assert app.sdc_direction.get() == "transverse"
+        assert app.pressure_case.get() == "non-response"
         report["checks"].append("tkinter-ui")
         if args.sdc or args.ndu:
             if not (args.sdc and args.ndu):
@@ -38,6 +40,13 @@ def self_test(args, app_class):
                 members = {g: {m.number for m in converter.base.collect_members(ndu,{g:1})} for g in selected}
                 request = converter.Request(args.sdc, args.ndu, groups=groups, shaft_profile="existing-screen")
                 plan = converter.prepare(request)
+                alternate = converter.prepare(converter.Request(
+                    args.sdc, args.ndu, groups=groups, shaft_profile="existing-screen",
+                    sdc_direction="longitudinal", pressure_case="response"))
+                assert alternate.report["configuration"]["sdc_direction_label"] == "（１）橋軸方向"
+                assert alternate.report["configuration"]["pressure_case_label"] == "・応答変位法の場合"
+                assert alternate.workbook.sheet("有効抵抗土圧").rows[0][1].value == "（１）橋軸方向・応答変位法の場合"
+                report["checks"].append("longitudinal-response-all-operations")
                 output = destination / "変換 結果.ndu"
                 saved = converter.save(plan, output)
                 assert output.read_bytes() == plan.data
@@ -67,6 +76,22 @@ def self_test(args, app_class):
                 assert selector.ready, selector.message.get()
                 assert set(selector.rows) == set(range(1, 7))
                 assert not view.selected
+                assert selector.catalog.columns == tuple(sorted(converter.base.parse_sdc(originals[args.sdc])[0].values))
+                app.sdc_direction.set("longitudinal")
+                assert not selector.ready and not app.groups.get()
+                deadline = time.monotonic() + 15
+                while not selector.ready and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                assert selector.ready, selector.message.get()
+                expected_columns = tuple(sorted(converter.base.parse_sdc(originals[args.sdc], "longitudinal")[0].values))
+                assert selector.catalog.columns == expected_columns
+                app.sdc_direction.set("transverse")
+                deadline = time.monotonic() + 15
+                while not selector.ready and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                assert selector.ready, selector.message.get()
                 for group in selected:
                     selector.rows[group].check.invoke()
                 assert selector.selection() == groups
@@ -123,7 +148,8 @@ def self_test(args, app_class):
                     selector.rows[group].check.invoke()
                 five = sorted((*selected,*extra),key=lambda g: (selector.rows[g].candidate.x,g))
                 def assigned(direction):
-                    mapping = {g:min(i,3) for i,g in enumerate(five if direction=="left" else five[::-1],1)}
+                    maximum = max(selector.catalog.columns)
+                    mapping = {g:min(i,maximum) for i,g in enumerate(five if direction=="left" else five[::-1],1)}
                     return tuple(f"{g}:{mapping[g]}" for g in sorted(mapping))
                 selector.direction_buttons["right"].invoke()
                 assert selector.selection() == assigned("right")

@@ -17,7 +17,7 @@ from test_fill_jiban_pressure import sdc_bytes, ndu_bytes
 
 
 class AssignmentTests(unittest.TestCase):
-    def test_physical_order_not_kg_number_or_selection_order_and_three_column_cap(self):
+    def test_physical_order_not_kg_number_or_selection_order_and_dynamic_column_cap(self):
         ids = [90, 10, 70, 30, 50, 20]
         catalog = Catalog(tuple(Candidate(g, i, i, D(31), "", D(i*5)) for i,g in enumerate(ids)),
                           D(31), (1, 2, 3, 4, 5, 6))
@@ -26,14 +26,18 @@ class AssignmentTests(unittest.TestCase):
             with self.subTest(count=count):
                 left = assign_columns(catalog, selected[::-1], "left")
                 right = assign_columns(catalog, selected[::-1], "right")
-                expected = [1, 2, 3, 3, 3, 3][:count]
+                expected = list(range(1, count + 1))
                 self.assertEqual(list(left), selected)
                 self.assertEqual(list(left.values()), expected)
                 self.assertEqual(list(right.values()), expected[::-1])
+        three = replace(catalog, columns=(1, 2, 3))
+        self.assertEqual(list(assign_columns(three, ids[:5], "left").values()), [1, 2, 3, 3, 3])
+        self.assertEqual(list(assign_columns(three, ids[:5], "right").values()), [3, 3, 3, 2, 1])
 
     def test_invalid_or_missing_source_column_does_not_silently_fall_back(self):
         catalog = Catalog(tuple(Candidate(g,g,g,D(31),"",D(g)) for g in (1,2,3)),D(31),(1,2))
-        for selected,direction in (([],"right"),([1,2,3],"right"),([9],"left"),([1],"unknown")):
+        self.assertEqual(list(assign_columns(catalog, [1,2,3], "right").values()), [2,2,1])
+        for selected,direction in (([],"right"),([9],"left"),([1],"unknown")):
             with self.subTest(selected=selected,direction=direction), self.assertRaises(base.InputError):
                 assign_columns(catalog, selected, direction)
 

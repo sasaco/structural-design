@@ -21,7 +21,9 @@ def run(operation, args):
                               pressure_cross_layer=args.cross_layer if operation=="pressure" else "integral-average",
                               pressure_decimals=getattr(args,"decimals",1),
                               shaft_k_decimals=getattr(args,"k_decimals",0),
-                              shaft_force_decimals=getattr(args,"force_decimals",1))
+                              shaft_force_decimals=getattr(args,"force_decimals",1),
+                              sdc_direction=getattr(args,"sdc_direction",app.sdc_columns.DEFAULT_DIRECTION),
+                              pressure_case=getattr(args,"pressure_case",app.sdc_columns.DEFAULT_PRESSURE_CASE))
         plan=app.prepare(request)
         output = plan.target if getattr(args,"write",False) else getattr(args,"output",None)
         output = Path(output).resolve() if output else None
@@ -42,7 +44,9 @@ def run(operation, args):
             plan=replace(plan,sources=(*plan.sources,(ref_path,ref_data)))
             plan.report["sources"].append(dict(path=str(ref_path),sha256=app.digest(ref_data),role="comparison-only"))
             _,comparison=app.pressure.make_plan(app.base.parse_ndu(dict(plan.sources)[plan.target]),
-                                               app.pressure.parse_pressure_sdc(dict(plan.sources)[request.sdc.resolve()]),
+                                               app.pressure.parse_pressure_sdc(
+                                                   dict(plan.sources)[request.sdc.resolve()],
+                                                   request.sdc_direction, request.pressure_case),
                                                app.base.parse_groups(args.groups),args.push_direction,args.decimals,
                                                args.cross_layer,app.base.parse_ndu(ref_data))
             plan.report["reference_comparison"]=comparison

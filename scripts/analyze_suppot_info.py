@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 
 import fill_jiban_shogen as base
+import sdc_columns
 
 ROOT = Path(__file__).resolve().parents[1]
 SDC = ROOT / "snap/今町橋りょう4P(右).sdc"
@@ -52,7 +53,7 @@ def parse_layers(raw: bytes) -> tuple[list[dict], D, D]:
     direction = lines.index("（２）直角方向")
     spring = lines.index("d）杭周面の鉛直せん断地盤ばね値", direction)
     capacity = lines.index("e）杭周面の支持力", spring)
-    beta_header = next(i for i in range(direction, spring) if "1/β(m)" in lines[i])
+    beta_header = next(i for i in range(direction, spring) if sdc_columns.is_pile_count_header(lines[i]))
     exclusion = D(lines[beta_header + 2].split(",")[-1].strip())
     pile_header = next(i for i, line in enumerate(lines) if line.startswith("杭長,突出長,根入れ深さ,"))
     pile_data = lines[pile_header + 1].split(",")

@@ -46,18 +46,19 @@ class Piece:
     lower: Decimal
 
 
-def parse_pressure_sdc(raw: bytes) -> list[PressureLayer]:
+def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION,
+                       pressure_case: str = sdc_columns.DEFAULT_PRESSURE_CASE) -> list[PressureLayer]:
     lines = [line.strip() for line in raw.decode("cp932").splitlines()]
+    direction, end = sdc_columns.direction_range(lines, sdc_direction)
+    direction_label = sdc_columns.DIRECTIONS[sdc_direction]
+    case_heading = sdc_columns.pressure_case_heading(pressure_case)
     try:
-        direction = lines.index("（２）直角方向")
-        end = next((i for i in range(direction + 1, len(lines))
-                    if re.match(r"[（(][３-９3-9][）)]", lines[i])), len(lines))
         section = lines.index("c）有効抵抗土圧力", direction + 1, end)
         section_end = next((i for i in range(section + 1, end)
                             if re.match(r"[a-z]）", lines[i])), end)
-        case = lines.index("・応答変位法以外の場合", section + 1, section_end)
+        case = lines.index(case_heading, section + 1, section_end)
     except ValueError as exc:
-        raise base.InputError("直角方向の有効抵抗土圧力（応答変位法以外）の表がありません。") from exc
+        raise base.InputError(f"{direction_label}の有効抵抗土圧力『{case_heading}』の表がありません。") from exc
     if case + 3 >= section_end or lines[case + 1] != "層番,層厚(m),地震時：有効抵抗土圧力(kN/m)":
         raise base.InputError("有効抵抗土圧力の層厚・単位の見出しを確認してください。")
     header = [field.strip() for field in lines[case + 2].split(",")]
@@ -207,6 +208,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
     parser.add_argument("--ndu", type=Path, default=base.DEFAULT_NDU)
+    parser.add_argument("--sdc-direction", choices=sdc_columns.DIRECTIONS, default=sdc_columns.DEFAULT_DIRECTION,
+                        help="SDC参照方向（longitudinal=橋軸、transverse=直角。既定: transverse）")
+    parser.add_argument("--pressure-case", choices=sdc_columns.PRESSURE_CASES,
+                        default=sdc_columns.DEFAULT_PRESSURE_CASE,
+                        help="土圧区分（non-response=応答変位法以外、response=応答変位法。既定: non-response）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:モデル列")
     parser.add_argument("--push-direction", choices=["right", "left", "direct"], default="right",
                         help="direct=指定SDC列をそのまま使用。right/left=従来のモデル列指定（既定:right）")
@@ -230,9 +236,13 @@ def main(argv: list[str] | None = None) -> int:
         ndu = base.parse_ndu(args.ndu.read_bytes())
         reference = base.parse_ndu(args.reference.read_bytes()) if args.reference else None
         groups = base.parse_groups(args.groups)
-        updates, report = make_plan(ndu, parse_pressure_sdc(sdc_raw), groups, args.push_direction,
+        updates, report = make_plan(ndu, parse_pressure_sdc(sdc_raw, args.sdc_direction, args.pressure_case), groups, args.push_direction,
                                     args.decimals, args.cross_layer, reference)
         report["configuration"] = {"push_direction": args.push_direction, "groups": groups,
+                                   "sdc_direction": args.sdc_direction,
+                                   "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
+                                   "pressure_case": args.pressure_case,
+                                   "pressure_case_label": sdc_columns.PRESSURE_CASES[args.pressure_case],
                                    "decimals": args.decimals, "rounding": "ROUND_HALF_UP", "cross_layer": args.cross_layer}
         report["sources"] = {"sdc": {"path": str(args.sdc.resolve()), "sha256": hashlib.sha256(sdc_raw).hexdigest()},
                              "ndu": {"path": str(args.ndu.resolve()), "sha256": hashlib.sha256(ndu.raw).hexdigest()}}

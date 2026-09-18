@@ -86,11 +86,10 @@ def read_table(lines: list[str], begin: int, end: int, width: int) -> list[tuple
     return rows
 
 
-def parse_sdc(raw: bytes) -> Profile:
-    """直角方向・押込み表の見出しを検証し、全層厚と有効長を分離する。"""
+def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) -> Profile:
+    """選択方向・押込み表の見出しを検証し、全層厚と有効長を分離する。"""
     lines = [s.strip() for s in raw.decode("cp932").splitlines()]
-    direction = locate(lines, "（２）直角方向")
-    end = next((i for i in range(direction + 1, len(lines)) if re.match(r"[（(][３-９3-9][）)]", lines[i])), len(lines))
+    direction, end = sdc_columns.direction_range(lines, sdc_direction)
     spring = locate(lines, "d）杭周面の鉛直せん断地盤ばね値", direction, end)
     force = locate(lines, "e）杭周面の支持力", spring + 1, end)
     force_end = next((i for i in range(force + 1, end) if re.match(r"[a-z]）", lines[i])), end)
@@ -134,7 +133,9 @@ def parse_sdc(raw: bytes) -> Profile:
     length, protrusion, embedment = [num(v, "杭条件") for v in p[:3]]
     if length <= 0 or protrusion != 0 or not ZERO <= embedment < length:
         raise InputError("正の杭長・突出長0・杭長未満の根入れ深さが必要です")
-    beta_header = locate(lines, "杭列数,奥行き本数,,1/β(m)", direction, spring)
+    beta_header = sdc_columns.pile_count_header(lines, direction, spring)
+    if beta_header is None:
+        raise InputError("SDCの杭配置条件（1/βまたはｌ/β）がありません")
     if beta_header + 2 >= spring:
         raise InputError("1/βの値がありません")
     beta_row = split(beta_header + 2)
@@ -362,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
     parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力NDU")
+    parser.add_argument("--sdc-direction", choices=sdc_columns.DIRECTIONS, default=sdc_columns.DEFAULT_DIRECTION,
+                        help="SDC参照方向（longitudinal=橋軸、transverse=直角。既定: transverse）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:SDC列")
     parser.add_argument("--profile", choices=["existing-screen"], help="既存画面方式を明示選択（出力には必須）")
     parser.add_argument("--k-decimals", type=int, choices=range(7), default=0)
@@ -387,10 +390,11 @@ def main(argv: list[str] | None = None) -> int:
             raise InputError("入力・出力・報告書は別のパスを指定してください")
         snapshots = {p: p.read_bytes() for p in inputs}
         ndu = base.parse_ndu(snapshots[args.ndu])
-        profile, groups = parse_sdc(snapshots[args.sdc]), base.parse_groups(args.groups)
+        profile, groups = parse_sdc(snapshots[args.sdc], args.sdc_direction), base.parse_groups(args.groups)
         updates, zeros, tips, rows = make_plan(ndu, profile, groups, args.k_decimals, args.force_decimals)
         result, summary = render_ndu(snapshots[args.ndu], updates, zeros)
         report = {"configuration": {"profile": "existing-screen", "profile_explicit": bool(args.profile), "groups": groups,
+                  "sdc_direction": args.sdc_direction, "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
                   "source_side": "compression", "all_stiffness_fields": "K1", "all_limit_fields": "Fy",
                   "capacity_divisor": "1", "tip": "preserve-not-generated", "k_decimals": args.k_decimals,
                   "force_decimals": args.force_decimals, "rounding": "ROUND_HALF_UP", "output_format": expected_suffix},

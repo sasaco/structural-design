@@ -81,21 +81,15 @@ def integer(text: str, label: str) -> int:
     return int(result)
 
 
-def parse_sdc(raw: bytes) -> list[Layer]:
-    """直角方向の水平地盤ばね表を、行番号ではなく見出しで特定する。"""
+def parse_sdc(raw: bytes, sdc_direction: str = columns.DEFAULT_DIRECTION) -> list[Layer]:
+    """選択方向の水平地盤ばね表を、行番号ではなく見出しで特定する。"""
     lines = raw.decode("cp932").splitlines()
-    try:
-        section = next(i for i, line in enumerate(lines) if line.strip() == "（２）直角方向")
-    except StopIteration as exc:
-        raise InputError("SDCに『（２）直角方向』がありません。") from exc
-    end = next(
-        (i for i in range(section + 1, len(lines)) if re.match(r"[（(][３-９3-9][）)]", lines[i].strip())),
-        len(lines),
-    )
+    section, end = columns.direction_range(lines, sdc_direction)
+    direction_label = columns.DIRECTIONS[sdc_direction]
     try:
         table = next(i for i in range(section + 1, end) if lines[i].strip() == "b）水平地盤ばね値")
     except StopIteration as exc:
-        raise InputError("SDCの直角方向に『b）水平地盤ばね値』がありません。") from exc
+        raise InputError(f"SDCの{direction_label}に『b）水平地盤ばね値』がありません。") from exc
     if table + 2 >= end or not lines[table + 1].startswith("層番,層厚(m),"):
         raise InputError("水平地盤ばね表の層番・層厚(m)の見出しを確認してください。")
     header = [field.strip() for field in lines[table + 2].split(",")]
@@ -288,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sdc", type=Path, default=DEFAULT_SDC, help="参照SDC（既定: test内の右基礎）")
     parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力先NDU（既定: test内）")
+    parser.add_argument("--sdc-direction", choices=columns.DIRECTIONS, default=columns.DEFAULT_DIRECTION,
+                        help="SDC参照方向（longitudinal=橋軸、transverse=直角。既定: transverse）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:列", help="KG番号:SDC杭列番号（既定: 4:1 5:2 6:3）")
     parser.add_argument("--cross-layer", choices=["error", "length-weighted", "midpoint", "skip"], default="length-weighted",
                         help="層境界: length-weighted=長さ加重平均・整数四捨五入、error=中止、midpoint=中央の層、skip=保留（既定: length-weighted）")
@@ -299,7 +295,7 @@ def main(argv: list[str] | None = None) -> int:
         return run("horizontal", args)
     try:
         groups = parse_groups(args.groups)
-        layers = parse_sdc(args.sdc.read_bytes())
+        layers = parse_sdc(args.sdc.read_bytes(), args.sdc_direction)
         ndu = parse_ndu(args.ndu.read_bytes())
         members = collect_members(ndu, groups)
         rows = []
@@ -315,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
         changed = sum(a != b for a, b in zip(ndu.lines, result.splitlines(keepends=True)))
         print(f"SDC: {args.sdc}")
         print(f"NDU: {args.ndu}")
-        print(f"参照: 直角方向 / 短期(非線形)、境界処理: {args.cross_layer}")
+        print(f"参照: {columns.DIRECTIONS[args.sdc_direction]} / 短期(非線形)、境界処理: {args.cross_layer}")
         print("対象: " + ", ".join(f"KGInfo{group}→{column}列目" for group, column in groups.items()))
         for member, overlaps, previous, value in rows:
             sources = ", ".join(f"SDC {o.layer.source_line}行:層{o.layer.number}×{format_number(o.length)}m" for o in overlaps)

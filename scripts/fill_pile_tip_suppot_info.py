@@ -88,15 +88,15 @@ def read_tip_table(lines: list[str], title: str, labels: list[str], n: int,
     return TipTable(values, refs, index+4, layout, interpretation)
 
 
-def parse_sdc(raw: bytes) -> Profile:
+def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) -> Profile:
     lines = [line.strip() for line in raw.decode("cp932").splitlines()]
-    direction = support.locate(lines, "（２）直角方向")
-    end = next((i for i in range(direction + 1, len(lines))
-                if re.match(r"[（(][３-９3-9][）)]", lines[i])), len(lines))
+    direction, end = sdc_columns.direction_range(lines, sdc_direction)
     spring = support.locate(lines, "f）杭先端の地盤ばね値", direction, end)
     force = support.locate(lines, "g）杭先端の支持力", spring + 1, end)
     force_end = next((i for i in range(force + 1, end) if re.match(r"[a-z]）", lines[i])), end)
-    header = support.locate(lines, "杭列数,奥行き本数,,1/β(m)", direction, spring)
+    header = sdc_columns.pile_count_header(lines, direction, spring)
+    if header is None:
+        raise InputError("SDCの杭配置条件（1/βまたはｌ/β）がありません")
     if header + 2 >= spring:
         raise InputError("SDCの杭列数がありません")
     arrangement = [v.strip() for v in lines[header + 2].split(",")]
@@ -200,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sdc", type=Path, default=base.DEFAULT_SDC)
     parser.add_argument("--ndu", type=Path, default=base.DEFAULT_NDU,
                         help="入力NDU")
+    parser.add_argument("--sdc-direction", choices=sdc_columns.DIRECTIONS, default=sdc_columns.DEFAULT_DIRECTION,
+                        help="SDC参照方向（longitudinal=橋軸、transverse=直角。既定: transverse）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:SDC列")
     parser.add_argument("--output", type=Path, help="別名NDU。省略時は確認表示")
     parser.add_argument("--report", type=Path, help="参照値・配置・NDU比較結果を保存するJSON")
@@ -221,11 +223,13 @@ def main(argv: list[str] | None = None) -> int:
             raise InputError("入力・出力・報告書は別のパスを指定してください")
         snapshots = {p: p.read_bytes() for p in inputs}
         ndu = base.parse_ndu(snapshots[args.ndu])
-        profile, groups = parse_sdc(snapshots[args.sdc]), base.parse_groups(args.groups)
+        profile, groups = parse_sdc(snapshots[args.sdc], args.sdc_direction), base.parse_groups(args.groups)
         updates, rows = make_plan(ndu, profile, groups)
         result, summary = support.render_ndu(snapshots[args.ndu], updates, set())
         report = {"configuration": {"profile": "existing-tip", "groups": groups,
-                  "direction": "直角方向", "k3": "K2", "negative_limits": "blank",
+                  "sdc_direction": args.sdc_direction,
+                  "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
+                  "direction": sdc_columns.DIRECTIONS[args.sdc_direction], "k3": "K2", "negative_limits": "blank",
                   "rounding": "none", "length_or_pile_count_factor": "none", "shaft_resistance": "not-added",
                   "output_format": suffix}, "field_names": list(support.FIELD_NAMES),
                   "sources": {str(p.resolve()): hashlib.sha256(v).hexdigest() for p, v in snapshots.items()},

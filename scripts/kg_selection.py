@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 import fill_jiban_shogen as base
+import sdc_columns
 from kg_candidates import assign_columns, inspect_candidates, round_length, validate_groups
 
 
@@ -21,9 +22,10 @@ class Row:
 
 
 class KGSelection(ttk.Frame):
-    def __init__(self, master, ndu_path, sdc_path, groups):
+    def __init__(self, master, ndu_path, sdc_path, groups, sdc_direction=None):
         super().__init__(master)
         self.ndu_path, self.sdc_path, self.groups = ndu_path, sdc_path, groups
+        self.sdc_direction = sdc_direction or tk.StringVar(self, value=sdc_columns.DEFAULT_DIRECTION)
         self.rows = {}
         self.catalog = None
         self.ready = False
@@ -57,9 +59,11 @@ class KGSelection(ttk.Frame):
             button = ttk.Button(actions, text=label, command=lambda d=direction: self.assign_columns(d))
             button.pack(side="left", padx=(8, 0))
             self.direction_buttons[direction] = button
-        ttk.Label(self, text="選択した杭を左から：右押し …3・3・2・1 ／ 左押し 1・2・3・3…",
+        self.assignment_help = tk.StringVar(value="選択方向のSDC列を読み込むと一括設定の割当を表示します。")
+        ttk.Label(self, textvariable=self.assignment_help,
                   wraplength=565, justify="left").pack(fill="x", pady=(4, 0))
-        self.traces = [(path, path.trace_add("write", self.path_changed)) for path in (ndu_path, sdc_path)]
+        self.traces = [(path, path.trace_add("write", self.path_changed))
+                       for path in (ndu_path, sdc_path, self.sdc_direction)]
         self.poll_id = self.after(75, self.poll)
         self.path_changed()
 
@@ -84,6 +88,7 @@ class KGSelection(ttk.Frame):
         self.catalog = None
         self.groups.set("")
         self.rows.clear()
+        self.assignment_help.set("選択方向のSDC列を読み込むと一括設定の割当を表示します。")
         self.set_locked(self.locked)
         for widget in self.list_frame.winfo_children():
             widget.destroy()
@@ -96,6 +101,7 @@ class KGSelection(ttk.Frame):
         self.pending_load = None
         generation = self.generation
         ndu_text, sdc_text = self.ndu_path.get().strip(), self.sdc_path.get().strip()
+        sdc_direction = self.sdc_direction.get()
 
         def worker():
             try:
@@ -112,7 +118,8 @@ class KGSelection(ttk.Frame):
                         sdc_raw = sdc.read_bytes()
                     except (OSError, ValueError) as exc:
                         sdc_error = "SDCを読み込めません：" + str(exc)
-                catalog, error = inspect_candidates(raw, sdc_raw, sdc_error), None
+                catalog, error = inspect_candidates(
+                    raw, sdc_raw, sdc_error, sdc_direction=sdc_direction), None
             except (OSError, ValueError, ArithmeticError, UnicodeError) as exc:
                 catalog, error = None, str(exc)
             self.results.put((generation, catalog, error))
@@ -136,6 +143,11 @@ class KGSelection(ttk.Frame):
 
     def render(self):
         self.ready = not self.catalog.error
+        if self.catalog.columns:
+            maximum = max(self.catalog.columns)
+            self.assignment_help.set(
+                f"選択した杭を左から：右押し …{maximum}・2・1 ／ "
+                f"左押し 1・2・…・{maximum}（超過分は{maximum}列目）")
         for index, candidate in enumerate(self.catalog.candidates):
             selected, column = tk.BooleanVar(value=False), tk.StringVar()
             check = ttk.Checkbutton(self.list_frame, text=f"KGInfo{candidate.group}", variable=selected,
@@ -161,7 +173,7 @@ class KGSelection(ttk.Frame):
         elif row.selected.get():
             used = {other.column.get() for key, other in self.rows.items() if key != group and other.selected.get()}
             if not row.column.get():
-                available = [col for col in self.catalog.columns if col <= 3]
+                available = list(self.catalog.columns)
                 row.column.set(next((str(col) for col in available if str(col) not in used),
                                     str(available[-1]) if available else ""))
         self.sync_groups()

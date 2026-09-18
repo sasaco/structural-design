@@ -18,9 +18,10 @@ import fill_suppot_info as support
 import fill_pile_tip_suppot_info as tip
 import calculation_record
 import excel_report
+import sdc_columns
 from kg_candidates import inspect_candidates, validate_groups
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 APP_NAME = "SDCConverter"
 InputError = base.InputError
 OPERATIONS = {
@@ -49,6 +50,9 @@ class Request:
     shaft_force_decimals: int = 1
     # GUIチェックリストの再検証。項目別CLIは従来どおり必要な表だけで実行できる。
     require_matching_lengths: bool = False
+    # 末尾へ追加し、既存の位置引数呼出しを維持する。
+    sdc_direction: str = sdc_columns.DEFAULT_DIRECTION
+    pressure_case: str = sdc_columns.DEFAULT_PRESSURE_CASE
 
 
 @dataclass(frozen=True)
@@ -116,6 +120,9 @@ def prepare(request: Request) -> Plan:
         raise InputError("周面ばねは『既存画面方式』を明示してください。")
     if request.push_direction not in ("right", "left", "direct"):
         raise InputError("土圧の列指定は direct / right / left を指定してください。")
+    direction_label = sdc_columns.choice_label(sdc_columns.DIRECTIONS, request.sdc_direction, "SDC参照方向")
+    pressure_case_label = sdc_columns.choice_label(
+        sdc_columns.PRESSURE_CASES, request.pressure_case, "有効抵抗土圧力の区分")
     if request.horizontal_cross_layer not in ("length-weighted", "midpoint", "skip", "error") or request.pressure_cross_layer not in ("integral-average", "endpoints", "error"):
         raise InputError("境界処理の指定が不正です。")
     if any(type(d) is not int or d not in range(7) for d in (request.pressure_decimals, request.shaft_k_decimals, request.shaft_force_decimals)):
@@ -131,7 +138,7 @@ def prepare(request: Request) -> Plan:
     sdc_raw, ndu_raw = sources[0][1], sources[1][1]
     # GUIの候補確認後に原本が編集されても、実際に計算するバイト列で再判定する。
     if request.require_matching_lengths:
-        validate_groups(inspect_candidates(ndu_raw, sdc_raw), groups)
+        validate_groups(inspect_candidates(ndu_raw, sdc_raw, sdc_direction=request.sdc_direction), groups)
     ndu = base.parse_ndu(ndu_raw)
     result = ndu_raw
     rows, details, profiles = [], {}, {}
@@ -140,7 +147,7 @@ def prepare(request: Request) -> Plan:
         if operation not in operations:
             continue
         if operation == "horizontal":
-            layers = base.parse_sdc(sdc_raw)
+            layers = base.parse_sdc(sdc_raw, request.sdc_direction)
             profiles[operation] = layers
             updates, evidence = {}, []
             current = base.parse_ndu(result)
@@ -167,7 +174,8 @@ def prepare(request: Request) -> Plan:
             details[operation] = {"members": evidence, "count": len(updates)}
         elif operation == "pressure":
             current = base.parse_ndu(result)
-            profiles[operation] = pressure.parse_pressure_sdc(sdc_raw)
+            profiles[operation] = pressure.parse_pressure_sdc(
+                sdc_raw, request.sdc_direction, request.pressure_case)
             updates, evidence = pressure.make_plan(current, profiles[operation], groups,
                                                    request.push_direction, request.pressure_decimals, request.pressure_cross_layer)
             for row in evidence["members"]:
@@ -179,12 +187,12 @@ def prepare(request: Request) -> Plan:
         else:
             zeros = set()
             if operation == "shaft":
-                profiles[operation] = support.parse_sdc(sdc_raw)
+                profiles[operation] = support.parse_sdc(sdc_raw, request.sdc_direction)
                 updates, zeros, tips, evidence = support.make_plan(ndu, profiles[operation], groups,
                                                                   request.shaft_k_decimals, request.shaft_force_decimals)
                 details[operation] = {"nodes": evidence, "unchanged_tip_nodes": sorted(tips), "zero_resistance_nodes": sorted(zeros)}
             else:
-                profiles[operation] = tip.parse_sdc(sdc_raw)
+                profiles[operation] = tip.parse_sdc(sdc_raw, request.sdc_direction)
                 updates, evidence = tip.make_plan(ndu, profiles[operation], groups)
                 details[operation] = {"nodes": evidence}
             rendered, summary = support.render_ndu(result, updates, zeros)
@@ -204,6 +212,9 @@ def prepare(request: Request) -> Plan:
         "schema_version": calculation_record.SCHEMA_VERSION, "run_id": uuid4().hex,
         "created_at": datetime.now().astimezone().isoformat(), "mode": "preview",
         "configuration": {"operations": list(operations), "groups": groups,
+                          "sdc_direction": request.sdc_direction, "sdc_direction_label": direction_label,
+                          "pressure_case": request.pressure_case,
+                          "pressure_case_label": pressure_case_label if "pressure" in operations else None,
                           "push_direction": request.push_direction, "shaft_profile": request.shaft_profile,
                           "horizontal_cross_layer": request.horizontal_cross_layer, "pressure_cross_layer": request.pressure_cross_layer,
                           "pressure_decimals": request.pressure_decimals, "shaft_k_decimals": request.shaft_k_decimals,

@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import portable_converter as converter
+import sdc_columns
 from model_preview import ModelPreview
 from excel_preview import ExcelPreview
 from kg_selection import KGSelection
@@ -33,14 +34,17 @@ class App:
         self.paths = {key: tk.StringVar() for key in ("sdc", "ndu", "output")}
         self.groups = tk.StringVar()
         self.overwrite = tk.BooleanVar(value=False)
-        self.auto_open = tk.BooleanVar(value=True)
+        self.auto_open = tk.BooleanVar(value=False)
         self.excel_output = tk.BooleanVar(value=True)
         self.operations = {key: tk.BooleanVar(value=True) for key in converter.OPERATIONS}
+        self.sdc_direction = tk.StringVar(value=sdc_columns.DEFAULT_DIRECTION)
+        self.pressure_case = tk.StringVar(value=sdc_columns.DEFAULT_PRESSURE_CASE)
         self.status = tk.StringVar(value="SDCと入力NDUを選択してください。")
         self.controls = []
         self.build_ui()
         self.output_changed()
         for variable in [self.groups, self.overwrite, self.excel_output,
+                         self.sdc_direction, self.pressure_case,
                          *self.paths.values(), *self.operations.values()]:
             variable.trace_add("write", self.invalidate)
         self.poll_id = root.after(100, self.poll)
@@ -93,22 +97,50 @@ class App:
             entry.grid(row=row, column=1, sticky="ew", padx=8)
             button = self.control(ttk.Button(source, text="選択…", command=lambda k=key: self.select(k)))
             button.grid(row=row, column=2)
-        settings = ttk.LabelFrame(form, text="2  入力する項目と杭の対応", padding=12)
+        conditions = ttk.LabelFrame(form, text="2  SDCの参照条件", padding=12)
+        conditions.pack(fill="x", pady=(10, 0))
+        ttk.Label(conditions, text="参照方向", width=18).grid(row=0, column=0, sticky="nw", pady=(0, 8))
+        direction_choices = ttk.Frame(conditions)
+        direction_choices.grid(row=0, column=1, sticky="w", pady=(0, 8))
+        self.sdc_direction_buttons = []
+        for key, label in sdc_columns.DIRECTIONS.items():
+            button = self.control(ttk.Radiobutton(
+                direction_choices, text=label, variable=self.sdc_direction, value=key))
+            button.pack(side="left", padx=(0, 14))
+            self.sdc_direction_buttons.append(button)
+        ttk.Label(conditions, text="有効抵抗土圧力", width=18).grid(row=1, column=0, sticky="nw")
+        pressure_choices = ttk.Frame(conditions)
+        pressure_choices.grid(row=1, column=1, sticky="w")
+        self.pressure_case_buttons = []
+        for key, label in sdc_columns.PRESSURE_CASES.items():
+            button = self.control(ttk.Radiobutton(
+                pressure_choices, text=label.removeprefix("・"), variable=self.pressure_case, value=key))
+            button.pack(side="left", padx=(0, 14))
+            self.pressure_case_buttons.append(button)
+        # ttk.Label(conditions, style="Hint.TLabel",
+        #           text="参照方向は4項目すべてに適用します。応答変位法の区分は有効抵抗土圧力だけに適用します。",
+        #           justify="left", wraplength=570).grid(
+        #               row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        settings = ttk.LabelFrame(form, text="3  入力する項目と杭の対応", padding=12)
         settings.pack(fill="x", pady=10)
         settings.columnconfigure(0, weight=1)
         settings.columnconfigure(1, weight=1)
         self.operation_buttons = {}
         for i, (key, label) in enumerate(converter.OPERATIONS.items()):
-            button = self.control(ttk.Checkbutton(settings, text=label, variable=self.operations[key]))
-            button.grid(row=i // 2, column=i % 2, sticky="w", padx=(0, 16), pady=(0, 8))
+            button = self.control(ttk.Checkbutton(
+                settings, text=label, variable=self.operations[key], command=self.apply_states))
+            # 非表示（だが常に実行）
+            # button.grid(row=i // 2, column=i % 2, sticky="w", padx=(0, 16), pady=(0, 8))
             self.operation_buttons[key] = button
-        self.group_selector = KGSelection(settings, self.paths["ndu"], self.paths["sdc"], self.groups)
+        self.group_selector = KGSelection(
+            settings, self.paths["ndu"], self.paths["sdc"], self.groups, self.sdc_direction)
         self.group_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
         ttk.Label(settings, style="Hint.TLabel",
-                  text="対応：SDCの番号列・奇数／偶数列形式（直角方向・短期）。指定したSDC列を各項目に使用します。\n"
+                  text="対応：SDCの番号列・奇数／偶数列形式。選択方向の指定SDC列を各項目に使用します。\n"
                        "周面は既存画面方式（押込みK1を正負の全勾配、Fyを正負の両制限値に設定）。",
                   justify="left", wraplength=570).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        destination = ttk.LabelFrame(form, text="3  保存先", padding=12)
+        destination = ttk.LabelFrame(form, text="4  保存先", padding=12)
         destination.pack(fill="x")
         destination.columnconfigure(0, weight=1)
         self.output_entry = self.control(ttk.Entry(destination, textvariable=self.paths["output"]))
@@ -120,7 +152,7 @@ class App:
         self.control(ttk.Checkbutton(choices, text="元ファイルを更新（日時付きバックアップを作成）",
                                     variable=self.overwrite, command=self.output_changed)).pack(anchor="w")
         self.control(ttk.Checkbutton(choices, text="完了後、関連付けアプリで開く",
-                                    variable=self.auto_open)).pack(anchor="w")
+                                    variable=self.auto_open))#.pack(anchor="w") # 「非表示だが、自動で開く機能は維持」するなら、末尾の .pack(anchor="w") だけ外します。
         self.control(ttk.Checkbutton(choices, text="計算過程をExcelに保存", variable=self.excel_output)).pack(anchor="w")
         ttk.Label(destination, text="Excelはモデルと同じフォルダーに、モデル名.実行ID.計算過程.xlsx として保存します。",
                   style="Hint.TLabel", wraplength=600).grid(row=2,column=0,columnspan=2,sticky="w",pady=(8,0))
@@ -157,6 +189,9 @@ class App:
         self.group_selector.set_locked(self.busy)
         if self.busy:
             return
+        if not self.operations["pressure"].get():
+            for widget in self.pressure_case_buttons:
+                widget.configure(state="disabled")
         for widget in (self.output_entry, self.output_button):
             widget.configure(state="disabled" if self.overwrite.get() else "normal")
 
@@ -200,6 +235,8 @@ class App:
             push_direction="direct",
             shaft_profile="existing-screen",
             require_matching_lengths=True,
+            sdc_direction=self.sdc_direction.get(),
+            pressure_case=self.pressure_case.get(),
         )
 
     def run(self, write):

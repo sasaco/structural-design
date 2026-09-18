@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
 import fill_jiban_shogen as base
+import sdc_columns
 
 
 def round_length(value: Decimal) -> Decimal:
@@ -33,7 +34,8 @@ class Catalog:
     error: str = ""
 
 
-def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "") -> Catalog:
+def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "",
+                       *, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) -> Catalog:
     ndu = base.parse_ndu(ndu_raw)
     groups = sorted(int(key[6:]) for key in ndu.records if key.startswith("KGInfo"))
     if not groups:
@@ -42,7 +44,7 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
     error = sdc_error or "参照SDCを選択してください。"
     if sdc_raw is not None:
         try:
-            layers = base.parse_sdc(sdc_raw)
+            layers = base.parse_sdc(sdc_raw, sdc_direction)
             thickness = sum((layer.bottom - layer.top for layer in layers), base.ZERO)
             columns = tuple(sorted(layers[0].values))
             error = ""
@@ -88,7 +90,7 @@ def validate_groups(catalog: Catalog, groups: dict[int, int]) -> None:
 
 
 def assign_columns(catalog: Catalog, selected: list[int], direction: str) -> dict[int, int]:
-    """選択杭をx座標順に並べ、押す側から1・2・3（以後3）を割り当てる。"""
+    """選択杭をx座標順に並べ、押す側から実SDCの最大列までを割り当てる。"""
     if direction not in ("right", "left"):
         raise base.InputError("列の自動設定は right / left を指定してください。")
     # 現在の手入力列ではなく、候補と選択KGの妥当性を確認する。
@@ -96,7 +98,8 @@ def assign_columns(catalog: Catalog, selected: list[int], direction: str) -> dic
     candidates = {item.group: item for item in catalog.candidates}
     ordered = sorted(selected, key=lambda group: (candidates[group].x, group))
     count = len(ordered)
-    groups = {group: min(count-index if direction == "right" else index+1, 3)
+    maximum = max(catalog.columns)
+    groups = {group: min(count-index if direction == "right" else index+1, maximum)
               for index, group in enumerate(ordered)}
     validate_groups(catalog, groups)
     return groups
