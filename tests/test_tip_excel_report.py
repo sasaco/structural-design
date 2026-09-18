@@ -20,6 +20,7 @@ from excel_test_helpers import sheet_xml, source_cell, print_names
 from excel_preview import ExcelPreview
 from test_fill_pile_tip_suppot_info import sdc_bytes
 from test_fill_suppot_info import ndu_bytes
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 
 
 def synthetic_request(folder, count, length='7.25'):
@@ -57,7 +58,7 @@ def synthetic_request(folder, count, length='7.25'):
 class TipReportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.request=app.Request(ROOT/'test/今町橋りょう4P(右).sdc',ROOT/'test/今町橋りょう4P(C方向･右押し→).ndu',operations=('tip',))
+        cls.request=app.Request(IMACHO_RIGHT_SDC, IMACHO_RIGHT_NDU, operations=('tip',))
         cls.plan=app.prepare(cls.request)
 
     def test_reference_cells_sources_and_all_ten_fields(self):
@@ -68,7 +69,7 @@ class TipReportTests(unittest.TestCase):
         self.assertEqual(sheet.freeze,(0,0));self.assertFalse(sheet.page_breaks)
         self.assertEqual(self.plan.data,self.request.ndu.read_bytes())
         expected=[(122,327072,88418,'7167.5','16724.3'),(147,218048,58945,'4778.4','11149.5'),(172,327072,88418,'7167.5','16724.3')]
-        raw=dict(line.split(b'=',1) for line in self.plan.data.splitlines() if b'=' in line)
+        supports=app.support_values(self.plan.data)
         for i,(node,k1,k2,fy,fu) in enumerate(expected):
             for r,vals in ((3+i,(k1,k2)),(11+i,(fy,fu))):
                 self.assertEqual(sheet.rows[r][0].value,node)
@@ -77,8 +78,7 @@ class TipReportTests(unittest.TestCase):
                     self.assertIsNone(sheet.rows[r][c].formula)
                     source_key=('tip',275 if r<8 else 293,(3*c+i+1) if r<8 else (3*(c-1)+i+1))
                     self.assertEqual(book.sources[source_key],(sheet.name,r,c))
-            tokens=raw[f'SuppotInfo{61+i}'.encode()].split(b',')[3:]
-            values=[D(t.decode().strip()) if t.strip() else None for t in tokens]
+            values=[D(t) if t else None for t in supports[node]]
             self.assertEqual(values,list(map(lambda v:D(str(v)) if v is not None else None,[k1,fy,None,k2,fu,None,k2,k1,k2,k2])))
         self.assertEqual(len(book.expected),12)
         self.assertEqual(len(book.geometry_checks),3)

@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import fill_suppot_info as app
 import fill_jiban_shogen as base
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 
 
 def sdc_bytes():
@@ -330,8 +331,8 @@ class CliTests(unittest.TestCase):
 
 class RealFixtureTests(unittest.TestCase):
     def test_all_60_nodes_against_independent_fraction_integrals(self):
-        ndu_path = app.ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"
-        sdc_path = app.ROOT / "snap/今町橋りょう4P(右).sdc"
+        ndu_path = IMACHO_RIGHT_NDU
+        sdc_path = IMACHO_RIGHT_SDC
         model_raw, sdc_raw = ndu_path.read_bytes(), sdc_path.read_bytes()
         updates, zeros, tips, _ = app.make_plan(base.parse_ndu(model_raw), app.parse_sdc(sdc_raw), {4: 1, 5: 2, 6: 3})
         self.assertEqual((len(updates), len(zeros), len(tips)), (60, 12, 3))

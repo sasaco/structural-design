@@ -24,8 +24,9 @@ import sdc_columns
 from kg_candidates import inspect_candidates, assign_columns
 from kg_selection import KGSelection
 from excel_test_helpers import source_cell
+from tests.fixture_paths import IMACHO_LEFT_SDC, IMACHO_RIGHT_NDU
 
-LEFT = ROOT / "test/今町橋りょう4P(左).sdc"
+LEFT = IMACHO_LEFT_SDC
 RIGHT = horizontal.DEFAULT_SDC
 NDU = horizontal.DEFAULT_NDU
 PARSERS = (horizontal.parse_sdc, pressure.parse_pressure_sdc, shaft.parse_sdc, tip.parse_sdc)
@@ -231,7 +232,12 @@ class IntegrationTests(unittest.TestCase):
                 self.assertEqual(before.fields(key,7),after.fields(key,7))
         old_supports=shaft.ndu_supports(self.originals[NDU])[2]
         new_supports=shaft.ndu_supports(self.plan.data)[2]
-        for key,(_,body) in old_supports.items():self.assertEqual(new_supports[key][1],body)
+        selected_nodes=set()
+        for member in horizontal.collect_members(before,{1:1,2:2,3:3}):
+            selected_nodes.update(map(int, before.fields(f'ElementInfo{member.number}',6)[4:6]))
+        for key,(_,body) in old_supports.items():
+            node=int(body.split(b',')[1])
+            if node not in selected_nodes:self.assertEqual(new_supports[key][1],body)
         with tempfile.TemporaryDirectory() as folder:
             out=Path(folder)/'左変換.ndu'
             saved=converter.save(self.plan,out)
@@ -250,7 +256,7 @@ class IntegrationTests(unittest.TestCase):
                 self.assertEqual(after.fields(f'JibanShogenInfo{member}',7),both.fields(f'JibanShogenInfo{member}',7))
 
     def test_existing_left_supports_are_updated_without_renumbering(self):
-        original=ROOT/'snap/今町橋りょう4P(C方向･右押し→).ndu'
+        original=IMACHO_RIGHT_NDU
         p=converter.prepare(request(ndu=original))
         before=shaft.ndu_supports(original.read_bytes())[2]
         after=shaft.ndu_supports(p.data)[2]

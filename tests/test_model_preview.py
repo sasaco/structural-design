@@ -10,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import model_preview as preview
+from tests.fixture_paths import IMACHO_RIGHT_NDU
 
 
 def fixture():
@@ -47,7 +48,7 @@ class ModelTests(unittest.TestCase):
                 preview.parse_model(raw)
 
     def test_real_ndu_selected_ranges_match_conversion_targets(self):
-        model = preview.parse_model(next((ROOT / "snap").glob("*右押し*.ndu")).read_bytes())
+        model = preview.parse_model(IMACHO_RIGHT_NDU.read_bytes())
         selected, groups = preview.selected_elements(model, "4:1 5:2 6:3")
         expected = set(range(98, 122)) | set(range(123, 147)) | set(range(148, 172))
         self.assertEqual(selected, expected)

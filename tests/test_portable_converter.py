@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import portable_converter as app
 from test_fill_pile_tip_suppot_info import sdc_bytes
 from test_fill_suppot_info import ndu_bytes
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 
 
 class PortableTests(unittest.TestCase):
@@ -156,8 +157,8 @@ class PortableTests(unittest.TestCase):
 
 class ProjectIntegrationTests(unittest.TestCase):
     def test_all_four_on_real_model_preserve_unrelated_fields_and_sources(self):
-        sdc = ROOT / "snap/今町橋りょう4P(右).sdc"
-        ndu = ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"
+        sdc = IMACHO_RIGHT_SDC
+        ndu = IMACHO_RIGHT_NDU
         before = {p: p.read_bytes() for p in (sdc, ndu)}
         plan = app.prepare(app.Request(sdc, ndu, shaft_profile="existing-screen"))
         self.assertEqual(len(plan.rows), 207)
@@ -180,8 +181,8 @@ class ProjectIntegrationTests(unittest.TestCase):
         self.assertEqual({p: p.read_bytes() for p in before}, before)
 
     def test_selecting_one_operation_never_runs_the_others(self):
-        sdc = ROOT / "snap/今町橋りょう4P(右).sdc"
-        ndu = ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"
+        sdc = IMACHO_RIGHT_SDC
+        ndu = IMACHO_RIGHT_NDU
         for operation, count in (("horizontal", 72), ("pressure", 72), ("shaft", 60), ("tip", 3)):
             with self.subTest(operation=operation):
                 plan = app.prepare(app.Request(sdc, ndu, operations=(operation,), shaft_profile="existing-screen"))

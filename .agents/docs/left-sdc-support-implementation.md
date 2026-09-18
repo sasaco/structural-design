@@ -2,7 +2,7 @@
 
 実装日: 2026-09-18。対象バージョン: SDC Converter 1.3.0。
 
-[承認済み計画](left-sdc-support-plan.md) に基づき、指定された `test/今町橋りょう4P(左).sdc` を原本のまま使用できるようにした。4項目の計算、NDU保存、JSON、主表5シートのExcel、GUIプレビュー、個別CLI、配布EXEまで確認済み。
+[承認済み計画](left-sdc-support-plan.md) に基づき、指定された `tests/data/今町橋りょう4P/今町橋りょう4P(左).sdc` を原本のまま使用できるようにした。4項目の計算、NDU保存、JSON、主表5シートのExcel、GUIプレビュー、個別CLI、配布EXEまで確認済み。
 
 ## 実装内容
 
@@ -28,8 +28,8 @@ GUIでは左SDCと対象NDUを指定し、モデル図を確認してKG1・2・3
 
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_pile_tip_suppot_info.py `
-  --sdc "test\今町橋りょう4P(左).sdc" `
-  --ndu "test\今町橋りょう4P(C方向･右押し→).ndu" `
+  --sdc "tests\data\今町橋りょう4P\今町橋りょう4P(左).sdc" `
+  --ndu "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" `
   --groups 1:3 2:2 3:1
 ```
 

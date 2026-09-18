@@ -34,14 +34,18 @@ def self_test(args, app_class):
             originals = {p: p.read_bytes() for p in (args.sdc, args.ndu) if p}
             with tempfile.TemporaryDirectory(prefix="SDCConverter-日本語 ") as folder:
                 destination = Path(folder)
+                sdc_input = destination / args.sdc.name
+                ndu_input = destination / args.ndu.name
+                sdc_input.write_bytes(originals[args.sdc])
+                ndu_input.write_bytes(originals[args.ndu])
                 selected = tuple(args.self_test_groups)
                 groups = tuple(f"{g}:{i}" for i,g in enumerate(selected,1))
                 ndu = converter.base.parse_ndu(originals[args.ndu])
                 members = {g: {m.number for m in converter.base.collect_members(ndu,{g:1})} for g in selected}
-                request = converter.Request(args.sdc, args.ndu, groups=groups, shaft_profile="existing-screen")
+                request = converter.Request(sdc_input, ndu_input, groups=groups, shaft_profile="existing-screen")
                 plan = converter.prepare(request)
                 alternate = converter.prepare(converter.Request(
-                    args.sdc, args.ndu, groups=groups, shaft_profile="existing-screen",
+                    sdc_input, ndu_input, groups=groups, shaft_profile="existing-screen",
                     sdc_direction="longitudinal", pressure_case="response"))
                 assert alternate.report["configuration"]["sdc_direction_label"] == "（１）橋軸方向"
                 assert alternate.report["configuration"]["pressure_case_label"] == "・応答変位法の場合"
@@ -52,7 +56,7 @@ def self_test(args, app_class):
                 assert output.read_bytes() == plan.data
                 audit = json.loads(saved.report.read_text(encoding="utf-8"))
                 assert audit["output_sha256"] == converter.digest(output.read_bytes())
-                rerun = converter.Request(args.sdc, output, operations=request.operations,
+                rerun = converter.Request(sdc_input, output, operations=request.operations,
                                           groups=groups, shaft_profile="existing-screen")
                 repeated = converter.prepare(rerun)
                 assert repeated.data == plan.data
@@ -62,8 +66,8 @@ def self_test(args, app_class):
                                          "sha256": converter.digest(plan.data), "backup": True})
                 # GUIの実ボタンと同じ実行経路（ワーカー→イベントキュー→Tk表示）も通す。
                 app.auto_open.set(False)
-                app.paths["sdc"].set(str(args.sdc))
-                app.paths["ndu"].set(str(args.ndu))
+                app.paths["sdc"].set(str(sdc_input))
+                app.paths["ndu"].set(str(ndu_input))
                 app.paths["output"].set(str(destination / "GUI 保存.ndu"))
                 # NDUの全KGを候補表示し、チェックボックス操作で図と変換対象を連動。
                 view = app.model_preview
@@ -134,7 +138,7 @@ def self_test(args, app_class):
                 assert row.check.instate(["disabled"]) and not row.selected.get()
                 assert "長さ不一致" in row.candidate.reason
                 report["checks"].append("kg-checkbox-length-mismatch-disabled")
-                app.paths["ndu"].set(str(args.ndu))
+                app.paths["ndu"].set(str(ndu_input))
                 deadline = time.monotonic() + 15
                 while not selector.ready and time.monotonic() < deadline:
                     root.update()

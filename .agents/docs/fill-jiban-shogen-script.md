@@ -8,8 +8,8 @@
 
 既定の入力ファイルは、リポジトリ直下から見て次の2つ。
 
-- SDC: `test\今町橋りょう4P(右).sdc`
-- NDU: `test\今町橋りょう4P(C方向･右押し→).ndu`
+- SDC: `tests\data\今町橋りょう4P\今町橋りょう4P(右).sdc`
+- NDU: `tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu`
 
 2026-09-17のユーザー指定に基づき、既定では `KGInfo4`（98～121）にSDCの1列目、`KGInfo5`（123～146）に2列目、`KGInfo6`（148～171）に3列目を対応させる。合計72部材。部材範囲は実行時に `KGInfo` から読む。
 
@@ -33,13 +33,17 @@ PowerShellでリポジトリ直下から実行する。パスの既定値はス�
 
 各部材について、相対深さ・現在値・入力予定値・参照SDCの行・各層との重なり長さを表示する。`--write` を省略するとファイルは変更しない。
 
-同じコマンドに `--write` を付けるとNDUを更新する。層境界は既定で重なり長さによる加重平均・整数四捨五入を適用する。
+同じコマンドに `--write` を付けるとNDUを更新する。`tests/data` はテスト原本なので、既定NDUへ
+直接 `--write` せず、一時ディレクトリまたは `outputs` へコピーしたNDUを `--ndu` で指定する。
+層境界は既定で重なり長さによる加重平均・整数四捨五入を適用する。
 
 ```powershell
-.venv\Scripts\python.exe scripts\fill_jiban_shogen.py --write
+Copy-Item "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" "outputs\水平ばね確認.ndu"
+.venv\Scripts\python.exe scripts\fill_jiban_shogen.py --ndu "outputs\水平ばね確認.ndu" --write
 ```
 
-更新前に `test\今町橋りょう4P(C方向･右押し→).ndu.bak` を作成する。既存バックアップは上書きしない。再実行時に既に同じ値なら、NDU・バックアップとも変更しない。
+更新前に、指定したNDUと同じ場所へ `.bak` を作成する。既存バックアップは上書きしない。
+再実行時に既に同じ値なら、NDU・バックアップとも変更しない。
 
 ## 層境界の扱い
 

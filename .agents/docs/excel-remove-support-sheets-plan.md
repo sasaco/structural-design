@@ -45,8 +45,8 @@
 | 資料 | SHA-256 |
 | --- | --- |
 | [先端改修済みの全工程Excel](../../outputs/tip-review-20260918-005232/今町橋りょう4P_計算過程_杭先端修正版.xlsx) | `9a5fe3e57eea39438fac4533f2962a76c8b8fb84fd7ef3b97c7d97906a4379fb` |
-| `test/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
-| `test/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
 | `test/今町橋りょう4P(C方向･右押し→)_変換済み.ndu.計算過程.見本xlsx.xlsx` | `7a406fc87569c07e1b8449084a25ce6cbf317677a713831bfd40526decbf4e3b` |
 
 上記4点は引き継ぎ時と同一。引き継ぎ本文とTempバックアップも同じSHA-256だった。

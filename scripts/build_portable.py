@@ -90,16 +90,16 @@ def main():
     environment["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32")
     smoke_report = session / "packaged-smoke.json"
     run([extracted / APP_NAME / f"{APP_NAME}.exe", "--self-test", smoke_report,
-         "--sdc", ROOT / "snap/今町橋りょう4P(右).sdc",
-         "--ndu", ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"],
+         "--sdc", ROOT / "tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc",
+         "--ndu", ROOT / "tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu"],
         cwd=extracted, env=environment, timeout=90)
     result = json.loads(smoke_report.read_text(encoding="utf-8"))
     if not result.get("ok") or not result.get("frozen"):
         raise RuntimeError(f"Packaged test failed; see {smoke_report}")
     left_smoke = session / "packaged-smoke-left.json"
     run([extracted / APP_NAME / f"{APP_NAME}.exe", "--self-test", left_smoke,
-         "--sdc", ROOT / "snap/今町橋りょう4P(左).sdc",
-         "--ndu", ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu",
+         "--sdc", ROOT / "tests/data/今町橋りょう4P/今町橋りょう4P(左).sdc",
+         "--ndu", ROOT / "tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu",
          "--self-test-groups", "1", "2", "3"],
         cwd=extracted, env=environment, timeout=90)
     left_result = json.loads(left_smoke.read_text(encoding="utf-8"))

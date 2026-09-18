@@ -40,8 +40,8 @@ Excel変換で出力する周面帳票を、ユーザー指定の
 | 資料 | SHA-256 |
 | --- | --- |
 | 指定 `test` 見本xlsx（完了時の最新版） | `7a406fc87569c07e1b8449084a25ce6cbf317677a713831bfd40526decbf4e3b` |
-| `test/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
-| `test/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
 
 開始時の見本は引き継ぎと同じ `ade06612087842f81a2caea6a6acc325c6f5c3641fa2bcb0f81f515e99084372` だった。
 調査中に `test` と `snap` の見本が外部更新されたため、終了時に指定 `test` 見本を再抽出した。

@@ -19,23 +19,31 @@ import fill_suppot_info as shaft
 import fill_pile_tip_suppot_info as tip
 import portable_converter as converter
 import sdc_columns
+from tests.fixture_paths import (
+    SAPPORO_LONGITUDINAL_NDU,
+    SAPPORO_SDC,
+    SAPPORO_TRANSVERSE_NDU,
+    SHINAGAWA_LONGITUDINAL_NDU,
+    SHINAGAWA_SDC,
+    SHINAGAWA_TRANSVERSE_NDU,
+)
 from kg_candidates import assign_columns, inspect_candidates
 from kg_selection import KGSelection
 
 
-SAPPORO = ROOT / "tests/testdata/札幌駅P2橋脚/P1_φ1.3_L10.0(fr_載荷試験).sdc"
-SHINAGAWA = ROOT / "tests/testdata/品川(東タ)道路P6/東タ改良 P6橋脚(No.4).sdc"
+SAPPORO = SAPPORO_SDC
+SHINAGAWA = SHINAGAWA_SDC
 
 # name, SDC, direction, NDU, KG:SDC列, expected preview rows
 CASES = (
     ("sapporo-longitudinal", SAPPORO, "longitudinal",
-     ROOT / "tests/testdata/札幌駅P2橋脚/P1_線路.ndu", ("1:2", "2:1"), 66),
+     SAPPORO_LONGITUDINAL_NDU, ("1:2", "2:1"), 66),
     ("sapporo-transverse", SAPPORO, "transverse",
-     ROOT / "tests/testdata/札幌駅P2橋脚/P1_直角.ndu", ("1:3", "2:2", "3:1"), 99),
+     SAPPORO_TRANSVERSE_NDU, ("1:3", "2:2", "3:1"), 99),
     ("shinagawa-longitudinal", SHINAGAWA, "longitudinal",
-     ROOT / "tests/testdata/品川(東タ)道路P6/線路方向.ndu", ("1:2", "2:1"), 138),
+     SHINAGAWA_LONGITUDINAL_NDU, ("1:2", "2:1"), 138),
     ("shinagawa-transverse", SHINAGAWA, "transverse",
-     ROOT / "tests/testdata/品川(東タ)道路P6/直角方向.ndu", ("1:2", "2:1"), 138),
+     SHINAGAWA_TRANSVERSE_NDU, ("1:2", "2:1"), 138),
 )
 
 

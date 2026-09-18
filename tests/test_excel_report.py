@@ -23,12 +23,13 @@ from excel_test_helpers import sheet_xml, source_cell, print_names
 from sdc_converter_app import App
 from test_fill_pile_tip_suppot_info import sdc_bytes
 from test_fill_suppot_info import ndu_bytes
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 
 
 class WorkbookTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.request=app.Request(ROOT/'snap/今町橋りょう4P(右).sdc',ROOT/'snap/今町橋りょう4P(C方向･右押し→).ndu',shaft_profile='existing-screen')
+        cls.request=app.Request(IMACHO_RIGHT_SDC, IMACHO_RIGHT_NDU, shaft_profile='existing-screen')
         cls.plan=app.prepare(cls.request)
 
     def test_all_expected_targets_pieces_and_fields(self):

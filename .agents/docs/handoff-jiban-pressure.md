@@ -40,10 +40,10 @@
 
 ## ファイルへの適用状況
 
-- `snap/今町橋りょう4P(C方向･右押し→).ndu`: 照合用。変更していない。
-- `snap/今町橋りょう4P(右).sdc`: 元資料。変更していない。
-- `test/今町橋りょう4P(C方向･右押し→).ndu`: 前段で水平地盤ばね値72部材を入力した元データ。今回の土圧処理では変更していない。
-- `test/今町橋りょう4P(C方向･右押し→).ndu.bak`: 前段のばね入力前のバックアップ。保持している。
+- `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`: 照合用。変更していない。
+- `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc`: 元資料。変更していない。
+- `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`: 前段で水平地盤ばね値72部材を入力した元データ。今回の土圧処理では変更していない。
+- `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu.bak`: 前段のばね入力前のバックアップ。保持している。
 - **`test/今町橋りょう4P(C方向･右押し→)_土圧入力済み.ndu`**: 今回の出力。前段のばね値を保持し、対象72部材の第3・第4フィールドへ土圧を入力済み。
 
 土圧スクリプトは入力原本を上書きせず、`--output` で別名NDUを作成する。ばね入力スクリプトの `--write` とはインターフェースが異なる。入力と同じ出力パスは拒否する。
@@ -89,7 +89,7 @@ PowerShell、リポジトリ直下:
 # 出力と比較JSON（入力が同じで出力内容も同じなら再実行可能）
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_jiban_pressure.py `
   --output "test\今町橋りょう4P(C方向･右押し→)_土圧入力済み.ndu" `
-  --reference "snap\今町橋りょう4P(C方向･右押し→).ndu" `
+  --reference "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" `
   --report ".agents\docs\jiban-pressure-verification.json"
 
 .venv\Scripts\python.exe -B -X utf8 -m unittest discover -s tests -q

@@ -18,8 +18,9 @@ import fill_jiban_shogen as base
 import sdc_columns
 
 ROOT = Path(__file__).resolve().parents[1]
-SDC = ROOT / "snap/今町橋りょう4P(右).sdc"
-NDU = ROOT / "snap/今町橋りょう4P(C方向･右押し→).ndu"
+DATA = ROOT / "tests" / "data" / "今町橋りょう4P"
+SDC = DATA / "今町橋りょう4P(右).sdc"
+NDU = DATA / "今町橋りょう4P(C方向･右押し→).ndu"
 GROUPS = {4: 1, 5: 2, 6: 3}
 ZERO = D(0)
 NAMES = ("k1_kN_per_m", "k2_kN_per_m", "fy_kN", "fu_kN")

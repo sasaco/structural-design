@@ -23,8 +23,8 @@ Excel変換で生成する「有効抵抗土圧」シートを、指定見本の
 | ファイル | SHA-256 |
 | --- | --- |
 | 指定見本xlsx | `3351add2a70af61dbdd680f4a87ca0e5bffddecc3286d7d759bab2a97a8109fa` |
-| `test/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
-| `test/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
 
 見本はhandoff時のハッシュと一致する。今回のブックは6シートで、`有効抵抗土圧 (2)` は存在しない。過去の水平表調査時とはブックの状態が異なるため、過去の抽出物を流用していない。
 

@@ -24,11 +24,11 @@ SDCからNDUへ値を取り込む際、現在固定されている次の条件�
 
 - Git HEAD: `2abe6a7`
 - Portableアプリの作業ツリー上のバージョン: `1.3.0`
-- 右SDC: `test/今町橋りょう4P(右).sdc`
+- 右SDC: `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc`
   - SHA-256: `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7`
-- 左SDC: `test/今町橋りょう4P(左).sdc`
+- 左SDC: `tests/data/今町橋りょう4P/今町橋りょう4P(左).sdc`
   - SHA-256: `b37d7471200649660f7b1a1224844e39170ecd4a398f84bd171c7a0263a5d536`
-- NDU: `test/今町橋りょう4P(C方向･右押し→).ndu`
+- NDU: `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`
   - SHA-256: `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a`
 
 調査中に、左SDCの番号列／奇数・偶数列対応に関する未コミット変更が作業ツリーへ外部から追加された。`scripts/sdc_columns.py`、4パーサ、共通変換、GUI、帳票記録、配布検証、文書、`tests/test_left_sdc.py` などが対象である。本対応はそれらを前提に追補し、上書き・巻き戻しをしない。

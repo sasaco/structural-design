@@ -13,6 +13,7 @@ import fill_pile_tip_suppot_info as app
 import fill_jiban_shogen as base
 import fill_suppot_info as support
 from test_fill_suppot_info import ndu_bytes
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 
 
 def sdc_bytes():
@@ -204,9 +205,8 @@ class CliTests(unittest.TestCase):
 
 class ActualFileTests(unittest.TestCase):
     def test_snap_ndu_exact_byte_match_all_three_tips(self):
-        root = Path(__file__).resolve().parents[1]
-        sdc = (root / "snap/今町橋りょう4P(右).sdc").read_bytes()
-        ndu = (root / "snap/今町橋りょう4P(C方向･右押し→).ndu").read_bytes()
+        sdc = IMACHO_RIGHT_SDC.read_bytes()
+        ndu = IMACHO_RIGHT_NDU.read_bytes()
         updates, rows = plan(ndu, sdc, {4: 1, 5: 2, 6: 3})
         self.assertEqual([r["node"] for r in rows], [122, 147, 172])
         self.assertEqual(updates[122], ["327072", "7167.5", " ", "88418", "16724.3", " ",

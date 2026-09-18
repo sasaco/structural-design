@@ -21,9 +21,9 @@ CLIでGUIと同じ直接列指定を使うには `--push-direction direct` を�
 
 ## 入出力と参照箇所
 
-- 参照SDC: `snap/今町橋りょう4P(右).sdc`。実行時の既定入力は同じ内容の `test/今町橋りょう4P(右).sdc`。
-- 照合用NDU: `snap/今町橋りょう4P(C方向･右押し→).ndu`。
-- 計算対象NDU: `test/今町橋りょう4P(C方向･右押し→).ndu`。
+- 参照SDC: `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc`。実行時の既定入力は同じ内容の `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc`。
+- 照合用NDU: `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`。
+- 計算対象NDU: `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`。
 - 参照表: 「（２）直角方向」内の「c）有効抵抗土圧力」→「・応答変位法以外の場合」。187～193行目の7層、単位kN/m。
 - 「・応答変位法の場合」（199～205行目）は別の表なので、この当時の照合では使用しない。
 
@@ -132,8 +132,8 @@ p(z) = p上 + (p下 − p上) × (z − a) / (b − a)
 
 # 計算結果を別名NDUへ出力し、snapの既存値との差分をJSONへ記録
 .venv\Scripts\python.exe scripts\fill_jiban_pressure.py `
-  --output "test\今町橋りょう4P(C方向･右押し→)_土圧入力済み.ndu" `
-  --reference "snap\今町橋りょう4P(C方向･右押し→).ndu" `
+  --output "outputs\今町橋りょう4P_土圧入力済み.ndu" `
+  --reference "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" `
   --report ".agents\docs\jiban-pressure-verification.json"
 
 # ばね値・土圧のテストを実行

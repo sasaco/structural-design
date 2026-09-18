@@ -12,8 +12,42 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import fill_jiban_shogen as base
 import fill_jiban_pressure as pressure
 import portable_converter as converter
+import sdc_columns
 from kg_candidates import Candidate, Catalog, assign_columns, inspect_candidates
 from test_fill_jiban_pressure import sdc_bytes, ndu_bytes
+
+
+class ColumnBoundaryTests(unittest.TestCase):
+    def test_condition_sets_are_exactly_one_known_or_observed_value(self):
+        self.assertEqual(sdc_columns.require_same_condition(("seismic",), "test"), "seismic")
+        for conditions, message in (((), "条件が一致"),
+                                    (("seismic", "liquefaction"), "液状化時 / 地震時"),
+                                    (("custom", "seismic"), "custom / 地震時")):
+            with self.subTest(conditions=conditions), self.assertRaisesRegex(
+                    base.InputError, message):
+                sdc_columns.require_same_condition(conditions, "test")
+
+    def test_pressure_tail_layout_accepts_only_observed_two_or_three_columns(self):
+        two = sdc_columns.pressure_tail_layout(sdc_columns.PRESSURE_TAIL, 2)
+        three = sdc_columns.pressure_tail_layout(sdc_columns.PRESSURE_TAIL, 3)
+        self.assertEqual(two.indices, {1: 0, 2: 1})
+        self.assertEqual(three.indices, {1: 0, 2: 1, 3: 2})
+        for labels, count in ((sdc_columns.PRESSURE_TAIL[::-1], 2),
+                              (sdc_columns.PRESSURE_TAIL, 1),
+                              (sdc_columns.PRESSURE_TAIL, 4),
+                              (sdc_columns.PRESSURE_TAIL, None)):
+            with self.subTest(labels=labels, count=count), self.assertRaises(base.InputError):
+                sdc_columns.pressure_tail_layout(labels, count)
+
+    def test_pile_count_rejects_truncated_and_non_numeric_rows(self):
+        heading = "杭列数,奥行き本数,,1/β(m)"
+        self.assertIsNone(sdc_columns.pile_count(["unrelated"], 0, 1))
+        with self.assertRaisesRegex(base.InputError, "杭列数がありません"):
+            sdc_columns.pile_count([heading, "labels"], 0, 2)
+        for value in ("abc", "NaN", "Infinity", "0", "1.5", "-1"):
+            lines = [heading, "labels", f"{value},3,2,4.9"]
+            with self.subTest(value=value), self.assertRaisesRegex(base.InputError, "正の整数"):
+                sdc_columns.pile_count(lines, 0, len(lines))
 
 
 class AssignmentTests(unittest.TestCase):

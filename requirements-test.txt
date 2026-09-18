@@ -1,0 +1,3 @@
+# Test and branch-coverage dependency.
+-r requirements.txt
+coverage==7.16.1

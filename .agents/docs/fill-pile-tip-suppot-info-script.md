@@ -29,17 +29,20 @@ PowerShell、リポジトリ直下で実行する。引数なしではファイ�
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_pile_tip_suppot_info.py
 ```
 
-既定入力は `test/今町橋りょう4P(右).sdc` と `test/今町橋りょう4P(C方向･右押し→).ndu`。現在のtest NDUは周面60支点が入力済みで、確認表示では先端3支点の追加後の件数63を示す。旧名の `_土圧入力済み.ndu` は参照しない。
+既定入力は `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` と `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`。
+現在のNDUは周面120件・先端6件の計126支点を持つ完成参照モデルで、既定設定では右基礎の
+既存先端3支点を照合・更新対象にする。旧名の `_土圧入力済み.ndu` は参照しない。
 
 ## 別名NDUへ出力
 
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_pile_tip_suppot_info.py `
-  --output "test\今町橋りょう4P(C方向･右押し→)_杭先端入力済み.ndu" `
-  --report ".agents\docs\pile-tip-fill-result.json"
+  --output "outputs\今町橋りょう4P_杭先端入力済み.ndu" `
+  --report "outputs\pile-tip-fill-result.json"
 ```
 
-現在のtest NDUからは `SuppotInfo61～63` を新規追加する。snap NDUを入力にすれば既存の `SuppotInfo124～126` が対象となる。キー番号はハードコードせず、先端節点と拘束方向で照合する。
+既定NDUでは既存の `SuppotInfo124～126` が対象となる。支点0件から追加する挙動は合成fixtureの
+単体テストで検証する。キー番号はハードコードせず、先端節点と拘束方向で照合する。
 
 ## 保存・検証の範囲
 
@@ -57,8 +60,8 @@ PowerShell、リポジトリ直下で実行する。引数なしではファイ�
 
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_pile_tip_suppot_info.py `
-  --sdc "snap\今町橋りょう4P(右).sdc" `
-  --ndu "snap\今町橋りょう4P(C方向･右押し→).ndu" `
+  --sdc "tests\data\今町橋りょう4P\今町橋りょう4P(右).sdc" `
+  --ndu "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" `
   --report ".agents\docs\pile-tip-suppot-info-verification.json"
 ```
 

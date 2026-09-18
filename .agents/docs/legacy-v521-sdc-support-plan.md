@@ -8,8 +8,8 @@
 
 次の2案件のSDCを、現行のSDC Converterで橋軸方向・直角方向とも使用できるようにする。
 
-- `tests/testdata/札幌駅P2橋脚/P1_φ1.3_L10.0(fr_載荷試験).sdc`
-- `tests/testdata/品川(東タ)道路P6/東タ改良 P6橋脚(No.4).sdc`
+- `tests/data/札幌駅P2橋脚/P1_φ1.3_L10.0(fr_載荷試験).sdc`
+- `tests/data/品川(東タ)道路P6/東タ改良 P6橋脚(No.4).sdc`
 
 対象は現行アプリの4処理である。
 
@@ -196,12 +196,12 @@ NDUへの10欄配置は現行の`TipValues.fields()`を変更しない。空欄�
 
 実装時に次の4本をGitインデックスから同じパスへ復元する。
 
-- `tests/testdata/札幌駅P2橋脚/P1_線路.ndu`
-- `tests/testdata/札幌駅P2橋脚/P1_直角.ndu`
-- `tests/testdata/品川(東タ)道路P6/線路方向.ndu`
-- `tests/testdata/品川(東タ)道路P6/直角方向.ndu`
+- `tests/data/札幌駅P2橋脚/P1_線路.ndu`
+- `tests/data/札幌駅P2橋脚/P1_直角.ndu`
+- `tests/data/品川(東タ)道路P6/線路方向.ndu`
+- `tests/data/品川(東タ)道路P6/直角方向.ndu`
 
-2本のSDCと4本のNDUを正規fixtureとし、`tests/testdata/README.md`の「旧方言の負例」を「Ver.5.2.1正例」へ更新する。実案件fixtureは配布ZIPには含めない。
+2本のSDCと4本のNDUを正規fixtureとし、`tests/data/README.md`の「旧方言の負例」を「Ver.5.2.1正例」へ更新する。実案件fixtureは配布ZIPには含めない。
 
 ## 8. テスト計画
 
@@ -290,7 +290,7 @@ NDUへの10欄配置は現行の`TipValues.fields()`を変更しない。空欄�
 
 実装と同じ変更で次を更新する。
 
-- `tests/testdata/README.md`
+- `tests/data/README.md`
 - `.agents/skills/sdc-ndu-format/references/sdc-supported-subset.md`
 - `.agents/skills/sdc-ndu-format/references/variants-and-unknowns.md`
 - `.agents/skills/sdc-ndu-format/references/source-map.md`
@@ -339,7 +339,7 @@ NDUへの10欄配置は現行の`TipValues.fields()`を変更しない。空欄�
 全対象部材が一致した。札幌土圧と既存NDUの周面・先端合成欄は計画どおり参照限定である。
 
 全discoverは210件を実行し、今回追加分を含む計算assertionに回帰はなかった。リポジトリ外の
-`snap/今町橋りょう4P(右).sdc` と `snap/今町橋りょう4P(C方向･右押し→).ndu` がないため、
+`tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` と `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` がないため、
 これらを要求する11エラー（サブテストを含む）は実行不能だった。長時間の回帰実行では、別々に生成した
 XLSXのバイト一致を要求する既存1件がZIP時刻メタデータ差で失敗することがある。外部fixture依存21件と
 この時刻依存1件だけを除いた207件は全成功し、液状化テスト10件は当該1件を含めた単独再実行で全成功した。

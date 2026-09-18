@@ -20,7 +20,7 @@ import fill_jiban_shogen as base
 import sdc_columns
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_NDU = ROOT / "test/今町橋りょう4P(C方向･右押し→)_土圧入力済み.ndu"
+DEFAULT_NDU = base.DEFAULT_NDU
 ZERO = D(0)
 FIELD_NAMES = ("開始節点", "終点節点", "拘束方向", "K1+", "F1+", "F1-",
                "K2+", "F2+", "F2-", "K3+", "K1-", "K2-", "K3-")

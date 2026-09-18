@@ -2,7 +2,7 @@
 
 ## Baseline
 
-この Skill 作成時のコミット基準点は `e9e3509` である。液状化時対応と回帰テストはこの基準点までにコミットされているため `verified` とする。以後の仕様変更時はこの節と関連ラベルを更新する。
+現在のコミット基準点は `f8ddd1f` である。液状化時対応、Ver.5.2.1共有値形式、回帰テストはこの基準点までにコミットされているため `verified` とする。以後の仕様変更時はこの節と関連ラベルを更新する。
 
 ## Implementation index
 
@@ -71,10 +71,10 @@ Ver.5.2.1共有値の4実ファイル組だけを確認する例:
 .venv\Scripts\python.exe -B -X utf8 -m unittest discover -s tests -p test_legacy_v521_sdc.py -q
 ```
 
-この対応は未コミットの作業ツリーで検証済みのため `worktree-verified`。コミット基準点ができるまでは
-`verified` に上げない。
+Ver.5.2.1共有値形式は `f8ddd1f` でコミット済みのため `verified` とする。
 
-全テストの一部はリポジトリ外の実案件 fixture `snap/今町橋りょう4P(右).sdc` と `snap/今町橋りょう4P(C方向･右押し→).ndu` を必要とする。これらがない環境では、実ファイル統合テストとその入力を共有する Excel テストが `FileNotFoundError`、入力ファイル不在、または `StopIteration` で失敗する。fixture 不在と計算・書換えロジックの assertion failure を区別して報告する。
+テスト fixture はすべてリポジトリ内の `tests/data` にある。テストと build smoke は外部 `snap/` や
+旧 `test/` に依存しない。対応は `tests/fixture_paths.py` と `tests/data/README.md` を一次案内とする。
 
 Skill 構造の確認:
 

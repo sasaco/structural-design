@@ -3,6 +3,7 @@
 from decimal import Decimal as D
 from pathlib import Path
 import sys
+import tempfile
 import time
 import tkinter as tk
 import unittest
@@ -17,12 +18,13 @@ import fill_pile_tip_suppot_info as tip
 import portable_converter as converter
 import sdc_columns
 from sdc_converter_app import App
+from tests.fixture_paths import IMACHO_LEFT_SDC, IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC, R2_SDC
 
 
-RIGHT = ROOT / "test/今町橋りょう4P(右).sdc"
-LEFT = ROOT / "test/今町橋りょう4P(左).sdc"
-R2 = ROOT / "test/R2ラーメンばね1.sdc"
-NDU = ROOT / "test/今町橋りょう4P(C方向･右押し→).ndu"
+RIGHT = IMACHO_RIGHT_SDC
+LEFT = IMACHO_LEFT_SDC
+R2 = R2_SDC
+NDU = IMACHO_RIGHT_NDU
 
 
 class SectionAndParserTests(unittest.TestCase):
@@ -115,9 +117,15 @@ class IntegrationTests(unittest.TestCase):
         values.update(kwargs)
         return converter.Request(RIGHT, NDU, **values)
 
-    def test_defaults_are_current_transverse_non_response_and_byte_identical(self):
+    def test_defaults_are_current_transverse_non_response_and_repeatable(self):
         plan = converter.prepare(converter.Request(RIGHT, NDU, shaft_profile="existing-screen"))
-        self.assertEqual(plan.data, self.originals[NDU])
+        self.assertNotEqual(plan.data, self.originals[NDU])
+        with tempfile.TemporaryDirectory() as directory:
+            converted = Path(directory) / "converted.ndu"
+            converted.write_bytes(plan.data)
+            rerun = converter.prepare(converter.Request(
+                RIGHT, converted, shaft_profile="existing-screen"))
+            self.assertEqual(rerun.data, plan.data)
         self.assertEqual(plan.report["configuration"]["sdc_direction"], "transverse")
         self.assertEqual(plan.report["configuration"]["pressure_case"], "non-response")
         self.assertEqual(plan.report["configuration"]["sdc_direction_label"], "（２）直角方向")

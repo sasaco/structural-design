@@ -55,7 +55,9 @@ SuppotInfo番号= ,節点番号,2,K,F,F,K,F,F,K,K,K,K
 
 **支点の増減時は、`SuppotInfo` と `Suppot_ChokuKisoCaseNo` の件数・末尾番号1～Nを必ず揃える。** 件数が変わらない更新でも欠落を0で補い、余剰0行を削除する。既存ケース値は保持し、重複・不正値・対応支点のない非0行は拒否する。削除・再採番時の対応維持を含む [共通編集ルール](suppot-info-editing-rules.md) を参照。
 
-既定の元NDU `test/..._土圧入力済み.ndu` は支点数0なので、この入力からは右基礎の周面支点60件を追加する。**元データに存在しない左基礎支点や杭先端支点は追加しない**。既存126支点の `snap/...ndu` を入力にすると右周面60件だけを更新し、支点数126を保持する。
+既定NDUは `tests/data/今町橋りょう4P` の完成参照モデルで、周面120件・先端6件の計126支点を持つ。
+右基礎を選ぶ既定設定では右周面60件だけを更新対象とし、支点数126と対象外支点を保持する。
+支点0件から追加する挙動は合成fixtureを使う単体テストで検証する。
 
 ## 実行方法
 
@@ -67,16 +69,16 @@ PowerShellでリポジトリ直下から実行する。標準ライブラリだ�
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_suppot_info.py
 ```
 
-既定SDCは `test/今町橋りょう4P(右).sdc`。SDCを明示する場合は `--sdc` を指定する。
+既定SDCは `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc`。SDCを明示する場合は `--sdc` を指定する。
 `--sdc-direction longitudinal` で橋軸方向、`transverse` で直角方向を選ぶ。既定は `transverse`。
 
-### 前段の土圧入力済みNDUへ追加する
+### 別名NDUへ出力する
 
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_suppot_info.py `
   --profile existing-screen `
-  --output "test\今町橋りょう4P(C方向･右押し→)_周面ばね入力済み.ndu" `
-  --report ".agents\docs\suppot-info-fill-verification.json"
+  --output "outputs\今町橋りょう4P_周面ばね入力済み.ndu" `
+  --report "outputs\suppot-info-fill-verification.json"
 ```
 
 出力先は `.ndu` を指定する。入力ファイルとのパス衝突やハードリンク経由の同一ファイルは拒否する。異なる内容の既存出力は上書きせず、同じ結果の再実行は許容する。報告書も同じ扱い。

@@ -45,7 +45,7 @@
 直前の検証済み全7シートExcel:
 `outputs/shaft-review-20260917-235254/今町橋りょう4P_計算過程_杭周面修正版.xlsx`
 
-これは `test/今町橋りょう4P(右).sdc` と `test/今町橋りょう4P(C方向･右押し→).ndu`、全4工程、KG対応 `4:1 5:2 6:3`、右押し、周面 `existing-screen` で作成した、モデル未保存の確認用出力。先端見本ではなく現行出力の確認資料として使う。
+これは `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` と `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu`、全4工程、KG対応 `4:1 5:2 6:3`、右押し、周面 `existing-screen` で作成した、モデル未保存の確認用出力。先端見本ではなく現行出力の確認資料として使う。
 
 ## 入力・見本の特定
 
@@ -57,8 +57,8 @@
 | ファイル | SHA-256 |
 | --- | --- |
 | `test/今町橋りょう4P(C方向･右押し→)_変換済み.ndu.計算過程.見本xlsx.xlsx` | `7a406fc87569c07e1b8449084a25ce6cbf317677a713831bfd40526decbf4e3b` |
-| `test/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
-| `test/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` | `31e9e85971d07ae1a0b21273f500b0d8d039184ecf9febb6db642fbfabfbd22a` |
 
 ## 既存計算と保護する事項
 

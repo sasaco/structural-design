@@ -76,7 +76,7 @@ GUIはNDU・全4項目選択で開始する。周面profileは `existing-screen`
 
 ### 2.4 過去資料との違い
 
-現在の `test/今町橋りょう4P(C方向･右押し→).ndu` は全4項目が入力済みで、63支点と63個のケース行がある。今回 `prepare()` で全項目を再計算しても出力バイト列は原本と同じだった。過去資料の「支点0」「周面60支点から先端を追加」は当時の状態である。
+現在の `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` は全4項目が入力済みで、63支点と63個のケース行がある。今回 `prepare()` で全項目を再計算しても出力バイト列は原本と同じだった。過去資料の「支点0」「周面60支点から先端を追加」は当時の状態である。
 
 周面CLIの `DEFAULT_NDU` は現在も旧名 `_土圧入力済み.ndu` を指すが、そのファイルは現作業フォルダーにはない。現在のモデルを調べるときは `--ndu` を明示する。GUIは選択したパスを用いるためこの既定値に依存しない。この不一致は本調査では修正しない。
 
@@ -402,10 +402,10 @@ Pythonからxlsxを生成できるライブラリを配布物へ同梱し、利�
 ```powershell
 # 将来のインターフェース例。現時点では --excel-report は未実装。
 .venv\Scripts\python.exe -B -X utf8 scripts\fill_suppot_info.py `
-  --sdc "test\今町橋りょう4P(右).sdc" `
-  --ndu "test\今町橋りょう4P(C方向･右押し→).ndu" `
+  --sdc "tests\data\今町橋りょう4P\今町橋りょう4P(右).sdc" `
+  --ndu "tests\data\今町橋りょう4P\今町橋りょう4P(C方向･右押し→).ndu" `
   --profile existing-screen `
-  --excel-report "test\周面ばね_計算確認.xlsx"
+  --excel-report "outputs\周面ばね_計算確認.xlsx"
 ```
 
 CLIの非既定値もそのまま記録する。水平 `midpoint` は中央深さと採用層、`skip` は保留理由と保持した現在値を載せる。土圧 `endpoints` は上下端採用であり積分平均と表示しない。周面の指定丸め桁数をGUI既定値で上書きしない。個別CLIをGUIの固定設定の `prepare()` にそのまま置き換えてはいけない。
@@ -490,8 +490,8 @@ Excel出力を選択した保存は、モデル・JSON・Excelが揃って初め
 
 | ファイル | SHA-256 |
 | --- | --- |
-| `test/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
-| `test/今町橋りょう4P(C方向･右押し→).ndu` | `cb723a2b359abc5d818dcc2b24f806044f0db321458792d9f32b5fa281efeec8` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(右).sdc` | `9b9aed2461b87acb5193c8eac79cf07b6d9824bdbd80e096416e197f324f64a7` |
+| `tests/data/今町橋りょう4P/今町橋りょう4P(C方向･右押し→).ndu` | `cb723a2b359abc5d818dcc2b24f806044f0db321458792d9f32b5fa281efeec8` |
 | `test/今町橋りょう4P(右).xlsx` | `8ceeb04b4d66bbf09f52215f818d8a1551589ad38fd6116c0321a51e8b73a4ca` |
 
 今回の再計算はメモリ上で行い、恒久的な変換済みNDUや新しい帳票xlsxは作成していない。本調査ではInput-JR/JRSNAPでの読込み・解析実行、GUI保存操作、配布EXEのExcel機能検証も未実施。既存のGUI/EXEについて別作業で行われた検証は [Portable配布仕様](portable-app.md) を参照し、未実装のExcel機能の検証と混同しない。

@@ -16,6 +16,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import portable_converter as app
+from tests.fixture_paths import IMACHO_RIGHT_NDU, IMACHO_RIGHT_SDC
 import excel_report as report
 from excel_test_helpers import source_cell
 
@@ -25,8 +26,7 @@ NS = {'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 class RemoveSupportSheetsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.request = app.Request(ROOT/'test/今町橋りょう4P(右).sdc',
-                                  ROOT/'test/今町橋りょう4P(C方向･右押し→).ndu',
+        cls.request = app.Request(IMACHO_RIGHT_SDC, IMACHO_RIGHT_NDU,
                                   shaft_profile='existing-screen')
         cls.plan = app.prepare(cls.request)
 

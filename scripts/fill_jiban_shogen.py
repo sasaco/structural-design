@@ -19,8 +19,9 @@ from sdc_columns import InputError
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SDC = ROOT / "test/今町橋りょう4P(右).sdc"
-DEFAULT_NDU = ROOT / "test/今町橋りょう4P(C方向･右押し→).ndu"
+TEST_DATA = ROOT / "tests" / "data" / "今町橋りょう4P"
+DEFAULT_SDC = TEST_DATA / "今町橋りょう4P(右).sdc"
+DEFAULT_NDU = TEST_DATA / "今町橋りょう4P(C方向･右押し→).ndu"
 ZERO = Decimal(0)
 
 
@@ -296,8 +297,8 @@ def write_with_backup(path: Path, expected: bytes, result: bytes) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--sdc", type=Path, default=DEFAULT_SDC, help="参照SDC（既定: test内の右基礎）")
-    parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力先NDU（既定: test内）")
+    parser.add_argument("--sdc", type=Path, default=DEFAULT_SDC, help="参照SDC（既定: tests/data内の右基礎）")
+    parser.add_argument("--ndu", type=Path, default=DEFAULT_NDU, help="入力先NDU（既定: tests/data内）")
     parser.add_argument("--sdc-direction", choices=columns.DIRECTIONS, default=columns.DEFAULT_DIRECTION,
                         help="SDC参照方向（longitudinal=橋軸、transverse=直角。既定: transverse）")
     parser.add_argument("--groups", nargs="+", default=["4:1", "5:2", "6:3"], metavar="KG:列", help="KG番号:SDC杭列番号（既定: 4:1 5:2 6:3）")
