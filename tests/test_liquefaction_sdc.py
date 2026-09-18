@@ -50,12 +50,18 @@ class LiquefactionParserTests(unittest.TestCase):
 
     def test_all_ten_parser_paths_detect_liquefaction(self):
         for direction, columns in (("longitudinal", 4), ("transverse", 2)):
+            expected_lines = {
+                "longitudinal": {"horizontal": 38, "pressure": (49, 59), "shaft": (70, 98), "tip": (125, 143)},
+                "transverse": {"horizontal": 158, "pressure": (169, 179), "shaft": (190, 218), "tip": (245, 263)},
+            }[direction]
             with self.subTest(direction=direction, operation="horizontal"):
                 layers = horizontal.parse_sdc(self.raw, direction)
                 self.assertEqual(layers[0].condition, "liquefaction")
                 self.assertEqual(len(layers[0].values), columns)
                 self.assertEqual(layers[0].values[1], D(0))
                 self.assertEqual(layers[1].values[1], D(63452 if columns == 4 else 105915))
+                self.assertEqual((layers[0].source_line, layers[0].sources[1].field),
+                                 (expected_lines["horizontal"], 11 if columns == 4 else 7))
             for pressure_case in ("non-response", "response"):
                 with self.subTest(direction=direction, operation="pressure", pressure_case=pressure_case):
                     layers = pressure.parse_pressure_sdc(self.raw, direction, pressure_case)
@@ -63,16 +69,33 @@ class LiquefactionParserTests(unittest.TestCase):
                     self.assertEqual(len(layers[0].values), columns)
                     expected = D("403.9" if columns == 4 else "807.8")
                     self.assertEqual(layers[1].values[1], (expected, expected))
+                    source = layers[0].sources[1]
+                    self.assertEqual((layers[0].source_line, source[0].field, source[1].field),
+                                     (expected_lines["pressure"][pressure_case == "response"], 3, 4))
             with self.subTest(direction=direction, operation="shaft"):
                 profile = shaft.parse_sdc(self.raw, direction)
                 self.assertEqual(profile.condition, "liquefaction")
                 self.assertEqual(len(profile.layers[0].values), columns)
                 self.assertEqual(profile.layers[-1].bottom, D("25.5"))
+                self.assertEqual(sum((max(D(0), layer.active_bottom - layer.active_top)
+                                      for layer in profile.layers), D(0)),
+                                 D("16.804" if columns == 4 else "16.615"))
+                layer = profile.layers[0]
+                self.assertEqual((layer.spring_line, layer.force_line,
+                                  layer.sources[1][0].field, layer.sources[1][1].field),
+                                 (*expected_lines["shaft"], 12 if columns == 4 else 8, 4))
             with self.subTest(direction=direction, operation="tip"):
                 profile = tip.parse_sdc(self.raw, direction)
                 self.assertEqual(profile.condition, "liquefaction")
                 expected_k1 = D(16 if columns == 4 else 32)
                 self.assertEqual(profile.values[1], tip.TipValues(expected_k1, D(0), D(0), D(0)))
+                refs = profile.sources[1]
+                self.assertEqual((profile.spring_line, profile.force_line,
+                                  refs["k1_kN_per_m"].field, refs["k2_kN_per_m"].field,
+                                  refs["fy_kN"].field, refs["fu_kN"].field),
+                                 (*expected_lines["tip"],
+                                  5 if columns == 4 else 3, 9 if columns == 4 else 5,
+                                  1, 5 if columns == 4 else 3))
 
     def test_transverse_pressure_accepts_only_consistent_zero_padding(self):
         layers = pressure.parse_pressure_sdc(self.raw, "transverse", "non-response")
