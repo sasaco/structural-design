@@ -30,6 +30,12 @@ GUIには周面の既存画面方式を明記し、共用APIへ `shaft_profile="
 実杭列数まで展開し、GUIでは1列目からの番号を指定する。元CSV欄と解釈種別はパーサーが保持する。
 詳しくは [左SDC対応計画](left-sdc-support-plan.md) と [実装・検証記録](left-sdc-support-implementation.md)。
 
+同日、確認済みの液状化時SDCにも対応した。新しい選択欄は設けず、選択方向内の既知見出しから
+`seismic` / `liquefaction` を完全一致で自動判定する。選択した工程間で条件が一致しない場合は変換を拒否する。
+JSONには条件の内部値と表示名を記録し、Excelの方向表示と杭先端勾配見出しにも「液状化時」を明示する。
+土圧の未見出し末尾ゼロ組、周面d表の先端除外による最終層厚0、液状化時先端のK2/Fy/Fu=0は、
+それぞれ限定した構造検証を満たす場合だけ受理する。詳細は [液状化時SDC対応計画](liquefaction-sdc-support-plan.md)。
+
 ## ソース構成
 
 - `scripts/sdc_converter_app.py`: GUI、ファイル選択、Excelプレビュー、バックグラウンド実行、関連付けアプリで開く。

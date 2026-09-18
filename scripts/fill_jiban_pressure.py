@@ -27,6 +27,7 @@ class PressureLayer:
     values: dict[int, tuple[Decimal, Decimal]]
     source_line: int
     sources: dict[int, tuple[sdc_columns.SourceColumn, sdc_columns.SourceColumn]] = field(default_factory=dict)
+    condition: str = "seismic"
 
     def at(self, column: int, depth: Decimal) -> Decimal:
         if not self.top <= depth <= self.bottom:
@@ -59,8 +60,16 @@ def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRE
         case = lines.index(case_heading, section + 1, section_end)
     except ValueError as exc:
         raise base.InputError(f"{direction_label}の有効抵抗土圧力『{case_heading}』の表がありません。") from exc
-    if case + 3 >= section_end or lines[case + 1] != "層番,層厚(m),地震時：有効抵抗土圧力(kN/m)":
+    if case + 3 >= section_end:
         raise base.InputError("有効抵抗土圧力の層厚・単位の見出しを確認してください。")
+    condition = sdc_columns.detect_condition(
+        lines[case + 1],
+        {
+            "seismic": ("層番,層厚(m),地震時：有効抵抗土圧力(kN/m)",),
+            "liquefaction": ("層番,層厚(m),液状化時：有効抵抗土圧力(kN/m)",),
+        },
+        "有効抵抗土圧力の層厚・単位の見出し",
+    )
     header = [field.strip() for field in lines[case + 2].split(",")]
     subheader = [field.strip() for field in lines[case + 3].split(",")]
     # 実SDCでは最後の杭列ラベルの後の空欄（末尾カンマ）が省略される。
@@ -79,12 +88,22 @@ def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRE
                for col, index in columns.items()}
     depth = base.ZERO
     layers = []
+    padding_width = None
     for i in range(case + 4, section_end):
         if not lines[i]:
             break
         fields = [field.strip() for field in lines[i].split(",")]
-        if len(fields) != len(header):
-            raise base.InputError(f"SDC {i + 1}行目: 土圧表の列数が見出しと一致しません。")
+        extra = len(fields) - len(header)
+        if extra < 0 or extra % 2:
+            raise base.InputError(f"SDC {i + 1}行目: 土圧表の余剰列はゼロ値の組である必要があります。")
+        if padding_width is None:
+            padding_width = extra
+        elif padding_width != extra:
+            raise base.InputError(f"SDC {i + 1}行目: 土圧表の余剰列数が他の層と一致しません。")
+        padding = [base.number(v, f"SDC {i + 1}行の土圧余剰列") for v in fields[len(header):]]
+        if any(padding):
+            raise base.InputError(f"SDC {i + 1}行目: 土圧表の余剰列はゼロである必要があります。")
+        fields = fields[:len(header)]
         number = base.integer(fields[0], f"SDC {i + 1}行目の層番")
         thickness = base.number(fields[1], f"第{number}層の層厚")
         if number != len(layers) + 1 or thickness <= 0:
@@ -95,7 +114,7 @@ def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRE
         raw_values = [base.number(v, f"SDC {i+1}行の土圧") for v in fields[2:]]
         if any(value < 0 for value in raw_values):
             raise base.InputError(f"第{number}層に負の土圧があります。")
-        layers.append(PressureLayer(number, depth, depth + thickness, values, i + 1, sources))
+        layers.append(PressureLayer(number, depth, depth + thickness, values, i + 1, sources, condition))
         depth += thickness
     if not layers:
         raise base.InputError("土圧表に層データがありません。")
@@ -236,11 +255,14 @@ def main(argv: list[str] | None = None) -> int:
         ndu = base.parse_ndu(args.ndu.read_bytes())
         reference = base.parse_ndu(args.reference.read_bytes()) if args.reference else None
         groups = base.parse_groups(args.groups)
-        updates, report = make_plan(ndu, parse_pressure_sdc(sdc_raw, args.sdc_direction, args.pressure_case), groups, args.push_direction,
+        layers = parse_pressure_sdc(sdc_raw, args.sdc_direction, args.pressure_case)
+        updates, report = make_plan(ndu, layers, groups, args.push_direction,
                                     args.decimals, args.cross_layer, reference)
         report["configuration"] = {"push_direction": args.push_direction, "groups": groups,
                                    "sdc_direction": args.sdc_direction,
                                    "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
+                                   "sdc_condition": layers[0].condition,
+                                   "sdc_condition_label": sdc_columns.CONDITIONS[layers[0].condition],
                                    "pressure_case": args.pressure_case,
                                    "pressure_case_label": sdc_columns.PRESSURE_CASES[args.pressure_case],
                                    "decimals": args.decimals, "rounding": "ROUND_HALF_UP", "cross_layer": args.cross_layer}

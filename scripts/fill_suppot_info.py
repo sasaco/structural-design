@@ -46,6 +46,7 @@ class Profile:
     length: D
     exclusion: D
     embedment: D
+    condition: str = "seismic"
 
 
 def num(value: str, label: str) -> D:
@@ -69,7 +70,8 @@ def locate(lines: list[str], text: str, start: int = 0, end: int | None = None) 
     return hits[0]
 
 
-def read_table(lines: list[str], begin: int, end: int, width: int) -> list[tuple[int, list[D]]]:
+def read_table(lines: list[str], begin: int, end: int, width: int, *,
+               allow_final_zero_thickness: bool = False) -> list[tuple[int, list[D]]]:
     rows = []
     for i in range(begin, end):
         if not lines[i] or lines[i].startswith("※"):
@@ -78,11 +80,15 @@ def read_table(lines: list[str], begin: int, end: int, width: int) -> list[tuple
         if len(fields) != width:
             raise InputError(f"SDC {i + 1}行: データ列数が見出しと一致しません")
         values = [num(v, f"SDC {i + 1}行") for v in fields]
-        if values[0] != len(rows) + 1 or values[1] <= 0:
+        if values[0] != len(rows) + 1 or values[1] < 0 or (values[1] == 0 and not allow_final_zero_thickness):
             raise InputError(f"SDC {i + 1}行: 層番は1から連続、層厚は正の値が必要です")
         rows.append((i + 1, values))
     if not rows:
         raise InputError("SDCに層データがありません")
+    if allow_final_zero_thickness:
+        for index, (line, values) in enumerate(rows):
+            if values[1] == 0 and (index != len(rows) - 1 or any(values[2:])):
+                raise InputError(f"SDC {line}行: 層厚0は最終層かつ残りの値がすべてゼロの場合だけ許容します")
     return rows
 
 
@@ -101,8 +107,14 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
         raise InputError("SDCの表見出しが不足しています")
     if lines[kside + 1] != "層番,層厚(m),杭周面の鉛直せん断地盤ばね値(kN/m2)":
         raise InputError("SDCのばね表の単位・見出しを確認してください")
-    if lines[fside + 1] != "層番,層厚,⊿l(m),地震時：杭周面支持力(kN/m)":
-        raise InputError("SDCの支持力表の単位・見出しを確認してください")
+    force_condition = sdc_columns.detect_condition(
+        lines[fside + 1],
+        {
+            "seismic": ("層番,層厚,⊿l(m),地震時：杭周面支持力(kN/m)",),
+            "liquefaction": ("層番,層厚,⊿l(m),液状化時：杭周面支持力(kN/m)",),
+        },
+        "SDCの周面支持力表の単位・見出し",
+    )
     split = lambda i: [s.strip() for s in lines[i].split(",")]
     kh, fh = split(kside + 3), split(fside + 3)
     if (len(fh) - 3) % 2 or len(fh) < 5:
@@ -116,11 +128,19 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
     k_sources = layout.sources(3+2*n, " 押込み 短期第1勾配 K1")
     f_sources = layout.sources(3, " 押込み 降伏点 Fy")
     sources = {col: (k_sources[col], f_sources[col]) for col in layout.indices}
-    if [v for v in split(kside + 2) if v] != ["長期", "短期(使用性・安全性)", "短期(復旧性・地震時-第1勾配)", "短期(復旧性・地震時-第2勾配)"]:
-        raise InputError("SDCのばね勾配見出しが不正です")
+    spring_condition = sdc_columns.detect_condition(
+        tuple(v for v in split(kside + 2) if v),
+        {
+            "seismic": (("長期", "短期(使用性・安全性)", "短期(復旧性・地震時-第1勾配)", "短期(復旧性・地震時-第2勾配)"),),
+            "liquefaction": (("長期", "短期(使用性・安全性)", "液状化時-第1勾配", "液状化時-第2勾配"),),
+        },
+        "SDCのばね勾配見出し",
+    )
+    condition = sdc_columns.require_same_condition(
+        (spring_condition, force_condition), "SDC周面ばね・支持力表")
     if [v for v in split(fside + 2) if v] != ["降伏点(ρgfy考慮)", "終局点(ρgfu考慮)"]:
         raise InputError("SDCの支持力見出しが不正です")
-    kr = read_table(lines, kside + 4, kend, len(kh))
+    kr = read_table(lines, kside + 4, kend, len(kh), allow_final_zero_thickness=True)
     fr = read_table(lines, fside + 4, fend, len(fh))
     if len(kr) != len(fr):
         raise InputError("ばね表と支持力表の層数が一致しません")
@@ -160,7 +180,7 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
         top = bottom
     if top != length:
         raise InputError("SDCの全層厚合計と杭長が一致しません")
-    return Profile(layers, length, exclusion, embedment)
+    return Profile(layers, length, exclusion, embedment, condition)
 
 
 def make_plan(ndu: base.Ndu, profile: Profile, groups: dict[int, int], k_digits: int = 0, f_digits: int = 1):
@@ -395,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
         result, summary = render_ndu(snapshots[args.ndu], updates, zeros)
         report = {"configuration": {"profile": "existing-screen", "profile_explicit": bool(args.profile), "groups": groups,
                   "sdc_direction": args.sdc_direction, "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
+                  "sdc_condition": profile.condition,
+                  "sdc_condition_label": sdc_columns.CONDITIONS[profile.condition],
                   "source_side": "compression", "all_stiffness_fields": "K1", "all_limit_fields": "Fy",
                   "capacity_divisor": "1", "tip": "preserve-not-generated", "k_decimals": args.k_decimals,
                   "force_decimals": args.force_decimals, "rounding": "ROUND_HALF_UP", "output_format": expected_suffix},
@@ -409,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise InputError(f"出力先の親ディレクトリがないか、異なる既存ファイルがあります: {path}")
         if any(p.read_bytes() != raw for p, raw in snapshots.items()):
             raise InputError("計算中に入力が変更されました。再実行してください")
-        print("既存画面方式: 押込み側K1→全勾配±、Fy→両制限値±、1.2除算なし、杭先端支点は保持（新規作成なし）")
+        print(f"既存画面方式（{sdc_columns.CONDITIONS[profile.condition]}）: 押込み側K1→全勾配±、Fy→両制限値±、1.2除算なし、杭先端支点は保持（新規作成なし）")
         for r in rows:
             print(f"節点{r['node']}: K={r['field4_to_13'][0]} kN/m, F={r['field4_to_13'][1]} kN")
         print(json.dumps(summary, ensure_ascii=False))

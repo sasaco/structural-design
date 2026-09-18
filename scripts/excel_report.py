@@ -11,6 +11,7 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 import fill_jiban_shogen as base
+import sdc_columns
 
 SHEET_NAMES = {"horizontal": "水平地盤ばね", "pressure": "有効抵抗土圧", "shaft": "杭周面ばね", "tip": "杭先端ばね"}
 SHAFT_FORCE_SHEET = "杭周面の支持力"
@@ -800,7 +801,7 @@ def build_shaft(book, spring, force, detail, fixed, src, length, k_digits, f_dig
             book.expected.append(Check(fn("ROUND",main_refs[kind,node],digits),fixed[ident,field]["after"],ident+":"+kind))
 
 
-def build_tip(book, sheet, rows, fixed, src, length, direction_label):
+def build_tip(book, sheet, rows, fixed, src, length, direction_label, condition):
     """先端のK/F原値を3列の上下2表へ直接置き、幾何と採用値は内部で照合する。"""
     sheet.layout, sheet.freeze, sheet.print_scale = "tip", (0,0), 100
     sheet.widths = [9,24.375,24.375]
@@ -845,8 +846,9 @@ def build_tip(book, sheet, rows, fixed, src, length, direction_label):
         sheet.range_merges[r+1,0] = (r+2,0)
         sheet.column_merges[r+1,1] = 2
 
+    gradient_label = "液状化時" if condition == "liquefaction" else "短期"
     tables = (("杭先端のばね定数","杭先端の鉛直地盤ばね定数\nKtv(kN/m)",
-               ("短期（第１勾配）","短期（第２勾配）"),quantities[:2]),
+               (f"{gradient_label}（第１勾配）",f"{gradient_label}（第２勾配）"),quantities[:2]),
               ("先端支持力","杭先端の鉛直地盤支持力\n(kN)",
                ("降伏点","終局点"),quantities[2:]))
     for index,(title,unit_title,labels,items) in enumerate(tables):
@@ -880,6 +882,9 @@ def build_tip(book, sheet, rows, fixed, src, length, direction_label):
 
 def build(report):
     record, config = report["calculation"], report["configuration"]
+    condition = config.get("sdc_condition", "seismic")
+    condition_label = config.get("sdc_condition_label", sdc_columns.CONDITIONS[condition])
+    direction_label = config["sdc_direction_label"] + (f"・{condition_label}" if condition == "liquefaction" else "")
     sheets = {op:Sheet(SHEET_NAMES[op]) for op in SHEET_NAMES if op in report["details"]}
     force_sheet = Sheet(SHAFT_FORCE_SHEET) if "shaft" in sheets else None
     main_sheets = []
@@ -892,6 +897,7 @@ def build(report):
         "SDCConverter.Status":"モデル保存と同一実行" if report.get("mode")=="saved" else "計算確認・モデル未保存",
         "SDCConverter.OutputSHA256":report["output_sha256"],
         "SDCConverter.SDCDirection":config["sdc_direction_label"],
+        "SDCConverter.SDCCondition":condition_label,
         "SDCConverter.PressureCase":config.get("pressure_case_label") or "not-used",
     })
     source_values = {(v["operation"],v["line"],v["field"]):numeric(v["value"]) for v in record["source_values"]}
@@ -915,16 +921,16 @@ def build(report):
     def length(expr): return fn("ROUND",expr,length_digits)
     if "horizontal" in sheets:
         build_horizontal(book,sheets["horizontal"],report["details"]["horizontal"]["members"],fixed,src,
-                         config["sdc_direction_label"])
+                         direction_label)
     if "pressure" in sheets:
         build_pressure(book,sheets["pressure"],report["details"]["pressure"]["members"],fixed,src,
                        config["pressure_decimals"],
-                       config["sdc_direction_label"]+"・"+config["pressure_case_label"].removeprefix("・"))
+                       direction_label+"・"+config["pressure_case_label"].removeprefix("・"))
     if "shaft" in sheets:
         build_shaft(book,sheets["shaft"],force_sheet,report["details"]["shaft"],fixed,src,length,
-                    config["shaft_k_decimals"],config["shaft_force_decimals"],config["sdc_direction_label"])
+                    config["shaft_k_decimals"],config["shaft_force_decimals"],direction_label)
     if "tip" in sheets:
         build_tip(book,sheets["tip"],report["details"]["tip"]["nodes"],fixed,src,length,
-                  config["sdc_direction_label"])
+                  direction_label,condition)
     book.recalculate()
     return book

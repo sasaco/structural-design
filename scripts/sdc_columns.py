@@ -23,6 +23,10 @@ PRESSURE_CASES = {
     "non-response": "・応答変位法以外の場合",
     "response": "・応答変位法の場合",
 }
+CONDITIONS = {
+    "seismic": "地震時",
+    "liquefaction": "液状化時",
+}
 DEFAULT_DIRECTION = "transverse"
 DEFAULT_PRESSURE_CASE = "non-response"
 
@@ -50,6 +54,23 @@ def direction_range(lines: list[str], direction: str = DEFAULT_DIRECTION) -> tup
 
 def pressure_case_heading(pressure_case: str = DEFAULT_PRESSURE_CASE) -> str:
     return choice_label(PRESSURE_CASES, pressure_case, "有効抵抗土圧力の区分")
+
+
+def detect_condition(value, aliases: dict[str, tuple], context: str) -> str:
+    """既知の完全一致別名だけからSDCの採用条件を判定する。"""
+    hits = [condition for condition, accepted in aliases.items() if value in accepted]
+    if len(hits) != 1:
+        raise InputError(f"{context}: 対応する条件見出しではありません。")
+    return hits[0]
+
+
+def require_same_condition(conditions, context: str) -> str:
+    """関連表の条件が1種類だけであることを保証する。"""
+    found = set(conditions)
+    if len(found) != 1:
+        labels = " / ".join(CONDITIONS.get(value, value) for value in sorted(found))
+        raise InputError(f"{context}: 条件が一致しません（{labels}）。")
+    return next(iter(found))
 
 
 @dataclass(frozen=True)

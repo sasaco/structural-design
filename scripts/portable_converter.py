@@ -202,6 +202,14 @@ def prepare(request: Request) -> Plan:
                                        format_support(previous.get(node)), format_support(values)))
             result = rendered
             details[operation]["summary"] = summary
+    operation_conditions = {
+        operation: (profile[0].condition if operation in ("horizontal", "pressure") else profile.condition)
+        for operation, profile in profiles.items()
+    }
+    condition = sdc_columns.require_same_condition(
+        operation_conditions.values(), "選択したSDC表")
+    for operation, value in operation_conditions.items():
+        details[operation]["condition"] = value
     # 支点数・ケース行を再検査し、再同期しても同一になることを確認する。
     base.parse_ndu(result)
     checked = support.sync_ndu_support_cases(result) if set(operations) & {"shaft", "tip"} else result
@@ -213,6 +221,8 @@ def prepare(request: Request) -> Plan:
         "created_at": datetime.now().astimezone().isoformat(), "mode": "preview",
         "configuration": {"operations": list(operations), "groups": groups,
                           "sdc_direction": request.sdc_direction, "sdc_direction_label": direction_label,
+                          "sdc_condition": condition,
+                          "sdc_condition_label": sdc_columns.CONDITIONS[condition],
                           "pressure_case": request.pressure_case,
                           "pressure_case_label": pressure_case_label if "pressure" in operations else None,
                           "push_direction": request.push_direction, "shaft_profile": request.shaft_profile,

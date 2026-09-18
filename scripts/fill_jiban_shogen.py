@@ -32,6 +32,7 @@ class Layer:
     values: dict[int, Decimal]
     source_line: int
     sources: dict[int, columns.SourceColumn] = field(default_factory=dict)
+    condition: str = "seismic"
 
 
 @dataclass(frozen=True)
@@ -86,14 +87,19 @@ def parse_sdc(raw: bytes, sdc_direction: str = columns.DEFAULT_DIRECTION) -> lis
     lines = raw.decode("cp932").splitlines()
     section, end = columns.direction_range(lines, sdc_direction)
     direction_label = columns.DIRECTIONS[sdc_direction]
-    try:
-        table = next(i for i in range(section + 1, end) if lines[i].strip() == "b）水平地盤ばね値")
-    except StopIteration as exc:
-        raise InputError(f"SDCの{direction_label}に『b）水平地盤ばね値』がありません。") from exc
+    table_titles = {
+        "seismic": ("b）水平地盤ばね値",),
+        "liquefaction": ("b）設計水平地盤ばね値",),
+    }
+    hits = [(i, condition) for i in range(section + 1, end)
+            for condition, titles in table_titles.items() if lines[i].strip() in titles]
+    if len(hits) != 1:
+        raise InputError(f"SDCの{direction_label}に既知の水平地盤ばね表が1個必要です。")
+    table, condition = hits[0]
     if table + 2 >= end or not lines[table + 1].startswith("層番,層厚(m),"):
         raise InputError("水平地盤ばね表の層番・層厚(m)の見出しを確認してください。")
     header = [field.strip() for field in lines[table + 2].split(",")]
-    prefix = "短期(非線形)-"
+    prefix = {"seismic": "短期(非線形)-", "liquefaction": "液状化時-"}[condition]
     positions = [i for i, label in enumerate(header) if label.startswith(prefix)]
     layout = columns.resolve([header[i][len(prefix):] for i in positions],
                              columns.pile_count(lines, section+1, end),
@@ -120,7 +126,7 @@ def parse_sdc(raw: bytes, sdc_direction: str = columns.DEFAULT_DIRECTION) -> lis
         raw_values = [number(fields[index], f"第{layer_number}層・{header[index]}") for index in positions]
         if any(value < 0 for value in raw_values):
             raise InputError(f"第{layer_number}層: 負のばね値があります。")
-        layers.append(Layer(layer_number, depth, depth + thickness, values, i + 1, sources))
+        layers.append(Layer(layer_number, depth, depth + thickness, values, i + 1, sources, condition))
         depth += thickness
     if not layers:
         raise InputError("水平地盤ばね表に層データがありません。")
@@ -186,7 +192,7 @@ def find_overlaps(member: Member, layers: list[Layer]) -> list[Overlap]:
     overlaps: list[Overlap] = []
     for layer in layers:
         if member.column not in layer.values:
-            raise InputError(f"SDCに短期(非線形)-{member.column}列目がありません。")
+            raise InputError(f"SDCに{columns.CONDITIONS[layer.condition]}-{member.column}列目がありません。")
         length = min(member.bottom, layer.bottom) - max(member.top, layer.top)
         if length > 0:
             overlaps.append(Overlap(layer, length))
@@ -311,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         changed = sum(a != b for a, b in zip(ndu.lines, result.splitlines(keepends=True)))
         print(f"SDC: {args.sdc}")
         print(f"NDU: {args.ndu}")
-        print(f"参照: {columns.DIRECTIONS[args.sdc_direction]} / 短期(非線形)、境界処理: {args.cross_layer}")
+        print(f"参照: {columns.DIRECTIONS[args.sdc_direction]} / {columns.CONDITIONS[layers[0].condition]}、境界処理: {args.cross_layer}")
         print("対象: " + ", ".join(f"KGInfo{group}→{column}列目" for group, column in groups.items()))
         for member, overlaps, previous, value in rows:
             sources = ", ".join(f"SDC {o.layer.source_line}行:層{o.layer.number}×{format_number(o.length)}m" for o in overlaps)

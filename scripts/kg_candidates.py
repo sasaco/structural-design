@@ -32,6 +32,7 @@ class Catalog:
     thickness: Decimal | None
     columns: tuple[int, ...]
     error: str = ""
+    condition: str | None = None
 
 
 def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "",
@@ -40,13 +41,14 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
     groups = sorted(int(key[6:]) for key in ndu.records if key.startswith("KGInfo"))
     if not groups:
         raise base.InputError("入力NDUにKGInfoがありません。")
-    thickness, columns = None, ()
+    thickness, columns, condition = None, (), None
     error = sdc_error or "参照SDCを選択してください。"
     if sdc_raw is not None:
         try:
             layers = base.parse_sdc(sdc_raw, sdc_direction)
             thickness = sum((layer.bottom - layer.top for layer in layers), base.ZERO)
             columns = tuple(sorted(layers[0].values))
+            condition = layers[0].condition
             error = ""
         except (ValueError, ArithmeticError, UnicodeError) as exc:
             error = "SDCを読み込めません：" + str(exc)
@@ -70,7 +72,7 @@ def inspect_candidates(ndu_raw: bytes, sdc_raw: bytes | None, sdc_error: str = "
         except (ValueError, ArithmeticError, UnicodeError) as exc:
             reason = str(exc)
         candidates.append(Candidate(group, start, end, length, reason, x))
-    return Catalog(tuple(candidates), thickness, columns, error)
+    return Catalog(tuple(candidates), thickness, columns, error, condition)
 
 
 def validate_groups(catalog: Catalog, groups: dict[int, int]) -> None:

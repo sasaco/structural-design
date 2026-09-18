@@ -44,6 +44,7 @@ class Profile:
     force_line: int
     sources: dict[int, dict[str, sdc_columns.SourceColumn]] = field(default_factory=dict)
     interpretation: str = "numbered"
+    condition: str = "seismic"
 
 
 @dataclass(frozen=True)
@@ -53,10 +54,12 @@ class TipTable:
     line: int
     layout: sdc_columns.ColumnLayout
     interpretation: str
+    condition: str | None = None
 
 
 def read_tip_table(lines: list[str], title: str, labels: list[str], n: int,
-                   begin: int, end: int, *, allow_omitted=False) -> TipTable:
+                   begin: int, end: int, *, allow_omitted=False,
+                   condition: str | None = None) -> TipTable:
     index = support.locate(lines, title, begin, end)
     if index + 3 >= end:
         raise InputError(f"SDC『{title}』の見出し・値が不足しています")
@@ -85,7 +88,7 @@ def read_tip_table(lines: list[str], title: str, labels: list[str], n: int,
     sources = [layout.sources(i*size, " "+label, interpretation) for i, label in enumerate(labels)]
     refs = {col: tuple(group[col] for group in sources) for col in layout.indices}
     values = {col: tuple(raw_values[ref.field-1] for ref in entries) for col, entries in refs.items()}
-    return TipTable(values, refs, index+4, layout, interpretation)
+    return TipTable(values, refs, index+4, layout, interpretation, condition)
 
 
 def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) -> Profile:
@@ -107,14 +110,53 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
                        if s in lines[spring + 1:force]]
     if len(vertical_titles) != 1:
         raise InputError("SDCの杭先端鉛直ばね(kN/m)の見出しが1個必要です")
-    k = read_tip_table(lines, vertical_titles[0], ["長期", "短期(第1勾配)", "短期(第2勾配)"],
-                       n, spring + 1, force, allow_omitted="Ver.5.2.3" in lines[:3])
+    vertical_title = vertical_titles[0]
+    vertical_index = support.locate(lines, vertical_title, spring + 1, force)
+    vertical_groups = tuple(v for v in (s.strip() for s in lines[vertical_index + 1].split(",")) if v)
+    omitted = "Ver.5.2.3" in lines[:3] and vertical_groups == ("長期", "短期")
+    condition = "seismic" if omitted else sdc_columns.detect_condition(
+        vertical_groups,
+        {
+            "seismic": (("長期", "短期(第1勾配)", "短期(第2勾配)"),),
+            "liquefaction": (("長期", "液状化時(第1勾配)", "液状化時(第2勾配)"),),
+        },
+        "SDCの杭先端鉛直ばね見出し",
+    )
+    vertical_labels = {
+        "seismic": ["長期", "短期(第1勾配)", "短期(第2勾配)"],
+        "liquefaction": ["長期", "液状化時(第1勾配)", "液状化時(第2勾配)"],
+    }[condition]
+    k = read_tip_table(lines, vertical_title, vertical_labels, n, spring + 1, force,
+                       allow_omitted=omitted, condition=condition)
     for title in ("杭先端の水平ばね値(kN/m)", "杭先端の回転ばね値(kN/m)"):
-        other = read_tip_table(lines, title, ["長期", "短期"], n, spring + 1, force)
+        other_index = support.locate(lines, title, spring + 1, force)
+        other_groups = tuple(v for v in (s.strip() for s in lines[other_index + 1].split(",")) if v)
+        other_condition = sdc_columns.detect_condition(
+            other_groups,
+            {
+                "seismic": (("長期", "短期"),),
+                "liquefaction": (("長期", "液状化時"),),
+            },
+            f"SDC『{title}』の見出し",
+        )
+        other_label = "短期" if other_condition == "seismic" else "液状化時"
+        other = read_tip_table(lines, title, ["長期", other_label], n, spring + 1, force,
+                               condition=other_condition)
         # 未使用の偶数区分も含め、表全体がゼロであることを確認する。
         if any(support.num(v, f"SDC {other.line}行") for v in lines[other.line-1].split(",")):
             raise InputError("水平・回転の先端ばねが非ゼロのSDCには対応していません")
-    f = read_tip_table(lines, "地震時：杭先端の鉛直地盤支持力(kN)",
+    force_titles = {
+        "seismic": ("地震時：杭先端の鉛直地盤支持力(kN)",),
+        "liquefaction": ("液状化時：杭先端の鉛直地盤支持力(kN)",),
+    }
+    force_hits = [(title, force_condition) for force_condition, titles in force_titles.items()
+                  for title in titles if title in lines[force + 1:force_end]]
+    if len(force_hits) != 1:
+        raise InputError("SDCの杭先端支持力の条件見出しが1個必要です")
+    force_title, force_condition = force_hits[0]
+    condition = sdc_columns.require_same_condition(
+        (condition, force_condition), "SDC先端ばね・支持力表")
+    f = read_tip_table(lines, force_title,
                        ["押し込み側(降伏点)", "押し込み側(終局点)"], n, force + 1, force_end)
     if f.layout.kind != k.layout.kind:
         raise InputError("SDC先端表: 鉛直ばねと支持力の杭列形式が一致しません")
@@ -130,12 +172,16 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
     values, sources = {}, {}
     for col in range(1, n + 1):
         v = TipValues(k.values[col][1], k.values[col][2], *f.values[col])
-        if min(v.k1, v.k2, v.fy, v.fu) <= 0 or v.fu < v.fy:
-            raise InputError(f"SDC {col}列目: 正のばね値・支持力、終局点≧降伏点が必要です")
+        invalid = (v.k1 <= 0 or v.fu < v.fy or
+                   (condition == "seismic" and min(v.k2, v.fy, v.fu) <= 0))
+        if invalid:
+            requirement = ("K1は正、K2・支持力は0以上" if condition == "liquefaction"
+                           else "正のばね値・支持力")
+            raise InputError(f"SDC {col}列目: {requirement}、終局点≧降伏点が必要です")
         values[col] = v
         sources[col] = dict(zip(("k1_kN_per_m", "k2_kN_per_m", "fy_kN", "fu_kN"),
                                 (*k.sources[col][1:], *f.sources[col])))
-    return Profile(length, values, k.line, f.line, sources, k.interpretation)
+    return Profile(length, values, k.line, f.line, sources, k.interpretation, condition)
 
 
 def make_plan(ndu: base.Ndu, profile: Profile, groups: dict[int, int]):
@@ -229,6 +275,8 @@ def main(argv: list[str] | None = None) -> int:
         report = {"configuration": {"profile": "existing-tip", "groups": groups,
                   "sdc_direction": args.sdc_direction,
                   "sdc_direction_label": sdc_columns.DIRECTIONS[args.sdc_direction],
+                  "sdc_condition": profile.condition,
+                  "sdc_condition_label": sdc_columns.CONDITIONS[profile.condition],
                   "direction": sdc_columns.DIRECTIONS[args.sdc_direction], "k3": "K2", "negative_limits": "blank",
                   "rounding": "none", "length_or_pile_count_factor": "none", "shaft_resistance": "not-added",
                   "output_format": suffix}, "field_names": list(support.FIELD_NAMES),
@@ -243,7 +291,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise InputError(f"出力先の親ディレクトリがないか、異なる既存ファイルがあります: {path}")
         if any(p.read_bytes() != raw for p, raw in snapshots.items()):
             raise InputError("計算中に入力が変更されました。再実行してください")
-        print("杭先端: K1±=短期K1、K2±=K3±=短期K2、F1+=Fy、F2+=Fu、負側制限値は空欄")
+        condition_label = "液状化時" if profile.condition == "liquefaction" else "短期"
+        print(f"杭先端: K1±={condition_label}K1、K2±=K3±={condition_label}K2、F1+=Fy、F2+=Fu、負側制限値は空欄")
         for row in rows:
             print(f"KG{row['group']} / SDC{row['column']}列 / 節点{row['node']}: "
                   f"K1={row['k1_kN_per_m']}, K2={row['k2_kN_per_m']} kN/m, "
