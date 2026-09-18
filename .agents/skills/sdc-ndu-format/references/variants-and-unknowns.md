@@ -6,7 +6,9 @@
 |---|---|---|
 | SDC direction | 橋軸方向 / 直角方向 | `verified` |
 | SDC columns | 番号列 / 奇数偶数列 | `verified` |
+| SDC columns | Ver.5.2.1共有値（2・3列） | `worktree-verified` |
 | Pressure columns | 1列目、2列目、3列目以降奇数、4列目以降偶数 | `verified` |
+| Pressure columns | 1列目、2列目、3列目以降 | `worktree-verified`（2・3列） |
 | Calculation condition | 地震時 | `verified` |
 | Calculation condition | 液状化時 | `verified` (`e9e3509`) |
 | NDU output | byte-preserving targeted rewrite | `verified` |
@@ -26,6 +28,7 @@
 - 同じ節点・方向にある複数支持
 - 杭先端の負担域に残る正の周面抵抗
 - 意味の分からない既存ばねを自動的にゼロ化・削除する処理
+- Ver.5.2.1共有値形式で杭列数1または4以上の入力
 
 ## Unknowns that must stay explicit
 
@@ -36,6 +39,8 @@
 - 杭先端対応で負側の力を空欄とする物理的根拠
 - 旧 CLI の右列反転が必要となる入力世代・適用範囲の完全な境界
 - 1件のモデルで観測した番号・座標・値が他モデルにも成り立つか
+- Ver.5.2.1の `3列目以降` 土圧を4列以上へ展開するときの列別意味
+- 札幌の既存NDUとSDCで一部一致しない土圧値、および既存NDUの周面・先端合成規則
 
 ## Adding a new dialect safely
 

@@ -1,4 +1,4 @@
-"""有効抵抗土圧力を層内で線形補間し、NDUの第3・第4フィールドを計算する。
+"""番号列・奇数偶数列・Ver.5.2.1末尾共有列の土圧をNDUへ入力する。
 
 元NDUは変更せず、--output に指定した別ファイルへ出力する。
 両端とも小数第1位に四捨五入する。層をまたぐ部材は分布の積分平均を上下端に入力する。
@@ -80,8 +80,18 @@ def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRE
     for i in range(2, len(header), 2):
         if header[i + 1] or subheader[i:i + 2] != ["上側", "下側"]:
             raise base.InputError("土圧表は杭列ごとの上側・下側の組が必要です。")
-    layout = sdc_columns.resolve(header[2::2], sdc_columns.pile_count(lines, direction+1, end),
-                                 pressure=True, context=f"SDC {case+3}行の土圧表")
+    count = sdc_columns.pile_count(lines, direction + 1, end)
+    column_labels = header[2::2]
+    if tuple(column_labels) == sdc_columns.PRESSURE_TAIL:
+        sdc_columns.require_legacy_shared_version(lines, f"SDC {case+3}行の土圧表")
+        if condition != "seismic":
+            raise base.InputError("Ver.5.2.1の3列目以降形式は地震時の土圧表だけに対応しています。")
+        layout = sdc_columns.pressure_tail_layout(
+            column_labels, count, context=f"SDC {case+3}行の土圧表"
+        )
+    else:
+        layout = sdc_columns.resolve(column_labels, count, pressure=True,
+                                     context=f"SDC {case+3}行の土圧表")
     columns = {col: 2+2*index for col, index in layout.indices.items()}
     sources = {col: tuple(sdc_columns.SourceColumn(index+offset+1, header[index]+label, layout.kind)
                          for offset, label in enumerate((" 上側", " 下側")))
@@ -114,6 +124,10 @@ def parse_pressure_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRE
         raw_values = [base.number(v, f"SDC {i+1}行の土圧") for v in fields[2:]]
         if any(value < 0 for value in raw_values):
             raise base.InputError(f"第{number}層に負の土圧があります。")
+        if layout.kind == "pressure-tail" and count == 2 and any(raw_values[4:6]):
+            raise base.InputError(
+                f"SDC {i+1}行目: 杭列数2の未使用『3列目以降』土圧はゼロである必要があります。"
+            )
         layers.append(PressureLayer(number, depth, depth + thickness, values, i + 1, sources, condition))
         depth += thickness
     if not layers:

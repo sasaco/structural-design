@@ -1,4 +1,4 @@
-"""番号列・奇数偶数列形式のSDCから、NDUの水平地盤ばね値を入力する。
+"""番号列・奇数偶数列・Ver.5.2.1共有値形式のSDCから、NDUの水平地盤ばね値を入力する。
 
 標準ライブラリのみを使用。CP932の入力を読み、変更箇所以外のバイトを保持する。
 """
@@ -99,14 +99,24 @@ def parse_sdc(raw: bytes, sdc_direction: str = columns.DEFAULT_DIRECTION) -> lis
     if table + 2 >= end or not lines[table + 1].startswith("層番,層厚(m),"):
         raise InputError("水平地盤ばね表の層番・層厚(m)の見出しを確認してください。")
     header = [field.strip() for field in lines[table + 2].split(",")]
-    prefix = {"seismic": "短期(非線形)-", "liquefaction": "液状化時-"}[condition]
-    positions = [i for i, label in enumerate(header) if label.startswith(prefix)]
-    layout = columns.resolve([header[i][len(prefix):] for i in positions],
-                             columns.pile_count(lines, section+1, end),
-                             context=f"SDC {table+3}行の水平ばね表")
-    indices = {col: positions[index] for col, index in layout.indices.items()}
-    sources = {col: columns.SourceColumn(index+1, header[index], layout.kind)
-               for col, index in indices.items()}
+    count = columns.pile_count(lines, section + 1, end)
+    legacy_header = ["", "", "長期", "短期(線形解析)", "短期(非線形解析)"]
+    if header == legacy_header:
+        if condition != "seismic":
+            raise InputError("Ver.5.2.1共有値形式は地震時の水平ばね表だけに対応しています。")
+        columns.require_legacy_shared_version(lines, f"SDC {table+3}行の水平ばね表")
+        layout = columns.shared_layout(count, header[4], context=f"SDC {table+3}行の水平ばね表")
+        positions = [4]
+        indices = {col: 4 for col in layout.indices}
+        sources = layout.sources(4, interpretation=columns.LEGACY_SHARED_INTERPRETATION)
+    else:
+        prefix = {"seismic": "短期(非線形)-", "liquefaction": "液状化時-"}[condition]
+        positions = [i for i, label in enumerate(header) if label.startswith(prefix)]
+        layout = columns.resolve([header[i][len(prefix):] for i in positions], count,
+                                 context=f"SDC {table+3}行の水平ばね表")
+        indices = {col: positions[index] for col, index in layout.indices.items()}
+        sources = {col: columns.SourceColumn(index+1, header[index], layout.kind)
+                   for col, index in indices.items()}
     layers: list[Layer] = []
     depth = ZERO
     for i in range(table + 3, end):

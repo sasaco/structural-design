@@ -1,4 +1,4 @@
-"""番号列・奇数偶数列形式のSDCの杭周面ばね・支持力をNDUのSuppotInfoへ入力する。
+"""番号列・奇数偶数列・Ver.5.2.1共有値形式の杭周面ばね・支持力をNDUへ入力する。
 
 既存画面方式: 押込み側K1を正負の全勾配、Fyを正負の両制限値へ設定する。
 原本は保持。--output省略は確認表示。出力時は--profile existing-screenを明示する。
@@ -117,19 +117,50 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
     )
     split = lambda i: [s.strip() for s in lines[i].split(",")]
     kh, fh = split(kside + 3), split(fside + 3)
-    if (len(fh) - 3) % 2 or len(fh) < 5:
-        raise InputError("SDC支持力表の列数が不正です")
-    n = (len(fh) - 3) // 2
-    cols = fh[3:3+n]
-    layout = sdc_columns.resolve(cols, sdc_columns.pile_count(lines, direction+1, end),
-                                 ordered=True, context=f"SDC {fside+4}行の周面支持力表")
-    if fh != ["", "", ""] + cols * 2 or kh != ["", ""] + cols * 2 + ["⊿l(m)"] + cols * 2:
-        raise InputError("SDC周面表: ばね・支持力の杭列見出しが一致しません。")
-    k_sources = layout.sources(3+2*n, " 押込み 短期第1勾配 K1")
-    f_sources = layout.sources(3, " 押込み 降伏点 Fy")
-    sources = {col: (k_sources[col], f_sources[col]) for col in layout.indices}
+    pile_count_value = sdc_columns.pile_count(lines, direction + 1, end)
+    legacy_shared = (len(kh) == 7 and len(fh) == 5 and
+                     kh[:2] != ["", ""] and fh[:3] != ["", "", ""])
+    if legacy_shared:
+        sdc_columns.require_legacy_shared_version(lines, f"SDC {kside+4}行の周面表")
+        expected_legacy_k_header = [
+            "", "", "長期", "短期(使用性・安全性)", "⊿l(m)",
+            "短期(復旧性・地震時-第1勾配)", "短期(復旧性・地震時-第2勾配)",
+        ]
+        if split(kside + 2) != expected_legacy_k_header:
+            raise InputError("SDCのVer.5.2.1周面ばね見出しが不正です")
+        layout = sdc_columns.shared_layout(
+            pile_count_value, "方向内共有値", context=f"SDC {kside+4}行の周面表"
+        )
+        sources = {
+            col: (
+                sdc_columns.SourceColumn(6, "短期(復旧性・地震時-第1勾配) 押込み K1",
+                                         sdc_columns.LEGACY_SHARED_INTERPRETATION),
+                sdc_columns.SourceColumn(4, "降伏点(ρgfy考慮) 押込み Fy",
+                                         sdc_columns.LEGACY_SHARED_INTERPRETATION),
+            )
+            for col in layout.indices
+        }
+        kr_begin, fr_begin = kside + 3, fside + 3
+        k_width, f_width = 7, 5
+        k_delta_index, f_delta_index = 4, 2
+    else:
+        if (len(fh) - 3) % 2 or len(fh) < 5:
+            raise InputError("SDC支持力表の列数が不正です")
+        n = (len(fh) - 3) // 2
+        cols = fh[3:3+n]
+        layout = sdc_columns.resolve(cols, pile_count_value, ordered=True,
+                                     context=f"SDC {fside+4}行の周面支持力表")
+        if fh != ["", "", ""] + cols * 2 or kh != ["", ""] + cols * 2 + ["⊿l(m)"] + cols * 2:
+            raise InputError("SDC周面表: ばね・支持力の杭列見出しが一致しません。")
+        k_sources = layout.sources(3+2*n, " 押込み 短期第1勾配 K1")
+        f_sources = layout.sources(3, " 押込み 降伏点 Fy")
+        sources = {col: (k_sources[col], f_sources[col]) for col in layout.indices}
+        kr_begin, fr_begin = kside + 4, fside + 4
+        k_width, f_width = len(kh), len(fh)
+        k_delta_index, f_delta_index = 2 + 2 * n, 2
+    spring_labels = tuple(v for v in split(kside + 2) if v and (not legacy_shared or v != "⊿l(m)"))
     spring_condition = sdc_columns.detect_condition(
-        tuple(v for v in split(kside + 2) if v),
+        spring_labels,
         {
             "seismic": (("長期", "短期(使用性・安全性)", "短期(復旧性・地震時-第1勾配)", "短期(復旧性・地震時-第2勾配)"),),
             "liquefaction": (("長期", "短期(使用性・安全性)", "液状化時-第1勾配", "液状化時-第2勾配"),),
@@ -140,8 +171,8 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
         (spring_condition, force_condition), "SDC周面ばね・支持力表")
     if [v for v in split(fside + 2) if v] != ["降伏点(ρgfy考慮)", "終局点(ρgfu考慮)"]:
         raise InputError("SDCの支持力見出しが不正です")
-    kr = read_table(lines, kside + 4, kend, len(kh), allow_final_zero_thickness=True)
-    fr = read_table(lines, fside + 4, fend, len(fh))
+    kr = read_table(lines, kr_begin, kend, k_width, allow_final_zero_thickness=True)
+    fr = read_table(lines, fr_begin, fend, f_width)
     if len(kr) != len(fr):
         raise InputError("ばね表と支持力表の層数が一致しません")
     pile_headers = [i for i, s in enumerate(lines) if s.startswith("杭長,突出長,根入れ深さ,")]
@@ -169,7 +200,7 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
         bottom = top + f[1]
         u, v = max(top, exclusion), min(bottom, length - embedment)
         active = max(ZERO, v - u)
-        if f[2] != active or k[2 + 2 * n] != active:
+        if f[f_delta_index] != active or k[k_delta_index] != active:
             raise InputError(f"第{int(f[0])}層: ⊿lと1/β・先端除外範囲が一致しません")
         # d表は先端除外分だけ層厚を短縮する形式を許容。上端除外は層厚から引かない。
         if k[1] not in (f[1], max(ZERO, min(bottom, length - embedment) - top)):

@@ -21,7 +21,7 @@ import excel_report
 import sdc_columns
 from kg_candidates import inspect_candidates, validate_groups
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 APP_NAME = "SDCConverter"
 InputError = base.InputError
 OPERATIONS = {

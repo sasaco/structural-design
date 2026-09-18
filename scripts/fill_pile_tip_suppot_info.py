@@ -1,4 +1,4 @@
-"""番号列・奇数偶数列形式のSDCの杭先端ばね・支持力をNDUのSuppotInfoへ入力する。
+"""番号列・奇数偶数列・Ver.5.2.1共有値形式の杭先端ばね・支持力をNDUへ入力する。
 
 指定snapモデルの配置: K1±=短期第1勾配、K2±=K3±=短期第2勾配、
 F1+=降伏、F2+=終局、負側制限値は空欄。長さ換算・周面抵抗の合成なし。
@@ -91,6 +91,33 @@ def read_tip_table(lines: list[str], title: str, labels: list[str], n: int,
     return TipTable(values, refs, index+4, layout, interpretation, condition)
 
 
+def read_legacy_shared_tip_table(lines: list[str], title: str, labels: list[str], n: int,
+                                 begin: int, end: int, *, displayed_labels: list[str],
+                                 condition: str = "seismic") -> TipTable:
+    """Ver.5.2.1の杭列見出しを省略した1組の値を、方向内の全杭列へ展開する。"""
+    index = support.locate(lines, title, begin, end)
+    if index + 2 >= end:
+        raise InputError(f"SDC『{title}』の見出し・値が不足しています")
+    split = lambda i: [v.strip() for v in lines[i].split(",")]
+    if split(index + 1) != displayed_labels:
+        raise InputError(f"SDC『{title}』のVer.5.2.1共有値見出しが不正です")
+    fields = split(index + 2)
+    if len(fields) != len(labels):
+        raise InputError(f"SDC {index + 3}行: データ列数が見出しの解釈と一致しません")
+    if index + 3 < end and lines[index + 3] and not lines[index + 3].startswith("※"):
+        raise InputError(f"SDC『{title}』の値は1行で指定してください")
+    layout = sdc_columns.shared_layout(n, "方向内共有値", context=f"SDC {index+2}行『{title}』")
+    raw_values = tuple(support.num(v, f"SDC {index + 3}行") for v in fields)
+    source_tuple = tuple(
+        sdc_columns.SourceColumn(i + 1, label, "tip-v5.2.1-shared-omitted-headings")
+        for i, label in enumerate(labels)
+    )
+    values = {col: raw_values for col in layout.indices}
+    sources = {col: source_tuple for col in layout.indices}
+    return TipTable(values, sources, index + 3, layout,
+                    "tip-v5.2.1-shared-omitted-headings", condition)
+
+
 def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) -> Profile:
     lines = [line.strip() for line in raw.decode("cp932").splitlines()]
     direction, end = sdc_columns.direction_range(lines, sdc_direction)
@@ -113,21 +140,32 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
     vertical_title = vertical_titles[0]
     vertical_index = support.locate(lines, vertical_title, spring + 1, force)
     vertical_groups = tuple(v for v in (s.strip() for s in lines[vertical_index + 1].split(",")) if v)
-    omitted = "Ver.5.2.3" in lines[:3] and vertical_groups == ("長期", "短期")
-    condition = "seismic" if omitted else sdc_columns.detect_condition(
-        vertical_groups,
-        {
-            "seismic": (("長期", "短期(第1勾配)", "短期(第2勾配)"),),
-            "liquefaction": (("長期", "液状化時(第1勾配)", "液状化時(第2勾配)"),),
-        },
-        "SDCの杭先端鉛直ばね見出し",
-    )
+    legacy_shared = vertical_groups == ("長期", "短期") and "Ver.5.2.3" not in lines[:3]
+    if legacy_shared:
+        sdc_columns.require_legacy_shared_version(lines, "SDCの杭先端鉛直ばね表")
+        condition = "seismic"
+    else:
+        omitted = "Ver.5.2.3" in lines[:3] and vertical_groups == ("長期", "短期")
+        condition = "seismic" if omitted else sdc_columns.detect_condition(
+            vertical_groups,
+            {
+                "seismic": (("長期", "短期(第1勾配)", "短期(第2勾配)"),),
+                "liquefaction": (("長期", "液状化時(第1勾配)", "液状化時(第2勾配)"),),
+            },
+            "SDCの杭先端鉛直ばね見出し",
+        )
     vertical_labels = {
         "seismic": ["長期", "短期(第1勾配)", "短期(第2勾配)"],
         "liquefaction": ["長期", "液状化時(第1勾配)", "液状化時(第2勾配)"],
     }[condition]
-    k = read_tip_table(lines, vertical_title, vertical_labels, n, spring + 1, force,
-                       allow_omitted=omitted, condition=condition)
+    if legacy_shared:
+        k = read_legacy_shared_tip_table(
+            lines, vertical_title, vertical_labels, n, spring + 1, force,
+            displayed_labels=["長期", "短期"], condition=condition,
+        )
+    else:
+        k = read_tip_table(lines, vertical_title, vertical_labels, n, spring + 1, force,
+                           allow_omitted=omitted, condition=condition)
     for title in ("杭先端の水平ばね値(kN/m)", "杭先端の回転ばね値(kN/m)"):
         other_index = support.locate(lines, title, spring + 1, force)
         other_groups = tuple(v for v in (s.strip() for s in lines[other_index + 1].split(",")) if v)
@@ -140,8 +178,14 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
             f"SDC『{title}』の見出し",
         )
         other_label = "短期" if other_condition == "seismic" else "液状化時"
-        other = read_tip_table(lines, title, ["長期", other_label], n, spring + 1, force,
-                               condition=other_condition)
+        if legacy_shared:
+            other = read_legacy_shared_tip_table(
+                lines, title, ["長期", other_label], n, spring + 1, force,
+                displayed_labels=["長期", other_label], condition=other_condition,
+            )
+        else:
+            other = read_tip_table(lines, title, ["長期", other_label], n, spring + 1, force,
+                                   condition=other_condition)
         # 未使用の偶数区分も含め、表全体がゼロであることを確認する。
         if any(support.num(v, f"SDC {other.line}行") for v in lines[other.line-1].split(",")):
             raise InputError("水平・回転の先端ばねが非ゼロのSDCには対応していません")
@@ -156,8 +200,14 @@ def parse_sdc(raw: bytes, sdc_direction: str = sdc_columns.DEFAULT_DIRECTION) ->
     force_title, force_condition = force_hits[0]
     condition = sdc_columns.require_same_condition(
         (condition, force_condition), "SDC先端ばね・支持力表")
-    f = read_tip_table(lines, force_title,
-                       ["押し込み側(降伏点)", "押し込み側(終局点)"], n, force + 1, force_end)
+    force_labels = ["押し込み側(降伏点)", "押し込み側(終局点)"]
+    if legacy_shared:
+        f = read_legacy_shared_tip_table(
+            lines, force_title, force_labels, n, force + 1, force_end,
+            displayed_labels=force_labels, condition=force_condition,
+        )
+    else:
+        f = read_tip_table(lines, force_title, force_labels, n, force + 1, force_end)
     if f.layout.kind != k.layout.kind:
         raise InputError("SDC先端表: 鉛直ばねと支持力の杭列形式が一致しません")
     pile_headers = [i for i, s in enumerate(lines) if s.startswith("杭長,突出長,根入れ深さ,")]

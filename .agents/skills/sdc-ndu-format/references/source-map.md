@@ -31,6 +31,7 @@
 | 液状化時 | `tests/test_liquefaction_sdc.py` |
 | GUI/一括変換 | `tests/test_portable_converter.py` |
 | KG候補とプレビュー | `tests/test_kg_selection.py`, `tests/test_model_preview.py` |
+| Ver.5.2.1共有値 | `tests/test_legacy_v521_sdc.py` |
 
 ## Historical design notes
 
@@ -48,6 +49,7 @@
 - `.agents/docs/left-sdc-support-plan.md`
 - `.agents/docs/left-sdc-support-implementation.md`
 - `.agents/docs/portable-app.md`
+- `.agents/docs/legacy-v521-sdc-support-plan.md`
 
 ## Verification commands
 
@@ -62,6 +64,15 @@
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 -m unittest discover -s tests -q
 ```
+
+Ver.5.2.1共有値の4実ファイル組だけを確認する例:
+
+```powershell
+.venv\Scripts\python.exe -B -X utf8 -m unittest discover -s tests -p test_legacy_v521_sdc.py -q
+```
+
+この対応は未コミットの作業ツリーで検証済みのため `worktree-verified`。コミット基準点ができるまでは
+`verified` に上げない。
 
 全テストの一部はリポジトリ外の実案件 fixture `snap/今町橋りょう4P(右).sdc` と `snap/今町橋りょう4P(C方向･右押し→).ndu` を必要とする。これらがない環境では、実ファイル統合テストとその入力を共有する Excel テストが `FileNotFoundError`、入力ファイル不在、または `StopIteration` で失敗する。fixture 不在と計算・書換えロジックの assertion failure を区別して報告する。
 

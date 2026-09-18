@@ -5,7 +5,7 @@
 
 ## 利用と対応範囲
 
-配布ZIP: `dist/SDCConverter-v1.4.0-win-x64.zip`。
+配布ZIP: `dist/SDCConverter-v1.5.0-win-x64.zip`。
 展開した `SDCConverter/SDCConverter.exe` を実行する。
 Python・pip・Visual Studio・Excelは利用者PCに不要。
 EXEと `_internal` は同じフォルダーに置く。
@@ -36,6 +36,12 @@ JSONには条件の内部値と表示名を記録し、Excelの方向表示と�
 土圧の未見出し末尾ゼロ組、周面d表の先端除外による最終層厚0、液状化時先端のK2/Fy/Fu=0は、
 それぞれ限定した構造検証を満たす場合だけ受理する。詳細は [液状化時SDC対応計画](liquefaction-sdc-support-plan.md)。
 
+同日、札幌駅P2橋脚・品川(東タ)道路P6で確認した `Ver.5.2.1` 共有値形式に対応した。
+水平・周面・先端の1組の値を実杭列2列または3列へ共有し、土圧の `1列目`、`2列目`、
+`3列目以降` を実杭列へ対応させる。バージョンだけでは判定せず、各表の完全な見出しと欄数も
+検証する。JSONとExcelは共有元の原SDC行・CSV欄を保持する。詳細は
+[Ver.5.2.1共有値SDC対応計画](legacy-v521-sdc-support-plan.md)。
+
 ## ソース構成
 
 - `scripts/sdc_converter_app.py`: GUI、ファイル選択、Excelプレビュー、バックグラウンド実行、関連付けアプリで開く。
@@ -44,7 +50,7 @@ JSONには条件の内部値と表示名を記録し、Excelの方向表示と�
 - `scripts/kg_candidates.py`: KGInfoの列挙、SDC地層厚合計と部材長合計の照合。
 - `scripts/kg_selection.py`: KGInfoチェックリスト、SDCモデル列の選択、候補のバックグラウンド再読込。
 - `scripts/portable_converter.py`: `Request` → `prepare()` → `Plan` → `save()`。GUI非依存。
-- `scripts/sdc_columns.py`: 参照方向・土圧区分、実杭列数、番号列・奇偶列、原CSV欄の共通処理。
+- `scripts/sdc_columns.py`: 参照方向・土圧区分、実杭列数、番号列・奇偶列・Ver.5.2.1共有値、原CSV欄の共通処理。
 - `scripts/portable_smoke.py`: Python / EXE共用の起動・実データ変換検証。
 - `scripts/build_portable.py`: 既存を含むテスト、ビルド、ZIP展開、EXE検証、配布ZIPとSHA-256出力。
 - `requirements.txt`: Excel生成用XlsxWriter 3.2.9。`requirements-build.txt` はこれとビルド依存を固定。
@@ -170,7 +176,7 @@ py -3.12 -m venv .venv
 `.venv-build/Scripts/python.exe` で `scripts/build_portable.py` を実行する。
 テスト、EXEビルド、ZIP展開後の検証が順に実行され、ログは統合ターミナルに表示される。
 子プロセスのテストやPyInstallerにデバッガーが自動接続しないよう `subProcess: false` を指定する。
-成功すると `dist/SDCConverter-v1.4.0-win-x64.zip` と `.zip.sha256`、右の `packaged-smoke.json`、左の `packaged-smoke-left.json` が生成される。
+成功すると `dist/SDCConverter-v1.5.0-win-x64.zip` と `.zip.sha256`、右の `packaged-smoke.json`、左の `packaged-smoke-left.json` が生成される。
 GUIを起動したい場合は、構成を **SDC Converter: GUI** に切り替える。
 
 ### 初回セットアップとターミナルからのビルド

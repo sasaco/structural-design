@@ -1,10 +1,14 @@
 # 有効抵抗土圧力の入力仕様
 
 2026-09-18追記：本書の数値照合は直角方向・応答変位法以外を対象にした履歴である。
-現行v1.4.0は `--sdc-direction {longitudinal,transverse}` と
+現行v1.5.0は `--sdc-direction {longitudinal,transverse}` と
 `--pressure-case {non-response,response}` に対応し、GUIでも両方を選択できる。
 既定値は本書と同じ直角方向・応答変位法以外。選択仕様は
 [SDC参照方向・応答変位法区分の選択対応](sdc-direction-pressure-case-selection-plan.md) を参照。
+
+同日追記：Ver.5.2.1共有値形式では `1列目`、`2列目`、`3列目以降` を使う。
+実杭列2列では未使用の第3区分が上下とも0であることを検証し、3列では第3区分を3列目へ使う。
+詳細は [Ver.5.2.1共有値SDC対応計画](legacy-v521-sdc-support-plan.md)。
 
 2026-09-18追記：GUI v1.2.0のSDCモデル列は、実際のSDC参照列を直接指定する。
 右押し・左押しボタンは選択杭の列を一括設定し、変換時の反転はしない。

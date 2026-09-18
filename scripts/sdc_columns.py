@@ -11,6 +11,9 @@ class InputError(ValueError):
 
 PARITY = ("奇数列", "偶数列")
 PRESSURE_PARITY = ("1列目", "2列目", "3列目以降奇数列", "4列目以降偶数列")
+PRESSURE_TAIL = ("1列目", "2列目", "3列目以降")
+LEGACY_SHARED_VERSION = "Ver.5.2.1"
+LEGACY_SHARED_INTERPRETATION = "v5.2.1-shared"
 PILE_COUNT_HEADERS = frozenset({
     "杭列数,奥行き本数,,1/β(m)",
     "杭列数,奥行き本数,,ｌ/β(m)",
@@ -90,6 +93,43 @@ class ColumnLayout:
         return {col: SourceColumn(offset + index + 1, self.labels[index] + suffix,
                                   interpretation or self.kind)
                 for col, index in self.indices.items()}
+
+
+def sdc_version(lines: list[str]) -> str:
+    """バージョン情報を完全一致の見出しから一意に取得する。"""
+    normalized = [line.strip() for line in lines]
+    hits = [i for i, line in enumerate(normalized) if line == "【バージョン情報】"]
+    if len(hits) != 1 or hits[0] + 1 >= len(lines) or not normalized[hits[0] + 1]:
+        raise InputError("SDCのバージョン情報が1個必要です。")
+    return normalized[hits[0] + 1]
+
+
+def require_legacy_shared_version(lines: list[str], context: str) -> None:
+    version = sdc_version(lines)
+    if version != LEGACY_SHARED_VERSION:
+        raise InputError(
+            f"{context}: 共有値の省略見出しは {LEGACY_SHARED_VERSION} だけに対応しています。"
+        )
+
+
+def shared_layout(count: int | None, label: str, *, context="SDC") -> ColumnLayout:
+    """Ver.5.2.1の1個の原欄を、観測済みの実杭列2本または3本へ展開する。"""
+    if count not in (2, 3):
+        raise InputError(f"{context}: Ver.5.2.1共有値形式の杭列数は2または3が必要です。")
+    return ColumnLayout((label,), {column: 0 for column in range(1, count + 1)}, "shared")
+
+
+def pressure_tail_layout(labels, count: int | None, *, context="SDC") -> ColumnLayout:
+    """1列目・2列目・3列目以降を、観測済みの実杭列2本または3本へ展開する。"""
+    labels = tuple(labels)
+    if labels != PRESSURE_TAIL:
+        raise InputError(f"{context}: 土圧の旧共有列見出しが一致しません。")
+    if count not in (2, 3):
+        raise InputError(f"{context}: Ver.5.2.1土圧形式の杭列数は2または3が必要です。")
+    indices = {1: 0, 2: 1}
+    if count == 3:
+        indices[3] = 2
+    return ColumnLayout(labels, indices, "pressure-tail")
 
 
 def is_pile_count_header(line: str) -> bool:
