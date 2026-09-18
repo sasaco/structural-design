@@ -1,0 +1,7 @@
+interface:
+  display_name: "SDC/NDU形式・対応知識"
+  short_description: "SDC・NDUの部分仕様、変換規則、保存条件を参照して検証"
+  default_prompt: "Use $sdc-ndu-format to inspect and validate the SDC/NDU format behavior and mappings in this repository."
+
+policy:
+  allow_implicit_invocation: true
