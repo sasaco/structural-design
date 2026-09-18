@@ -33,7 +33,7 @@ class App:
         self.last_saved = None
         self.paths = {key: tk.StringVar() for key in ("sdc", "ndu", "output")}
         self.groups = tk.StringVar()
-        self.overwrite = tk.BooleanVar(value=False)
+        self.overwrite = tk.BooleanVar(value=True)
         self.auto_open = tk.BooleanVar(value=False)
         self.excel_output = tk.BooleanVar(value=True)
         self.operations = {key: tk.BooleanVar(value=True) for key in converter.OPERATIONS}
@@ -136,26 +136,29 @@ class App:
         self.group_selector = KGSelection(
             settings, self.paths["ndu"], self.paths["sdc"], self.groups, self.sdc_direction)
         self.group_selector.grid(row=2, column=0, columnspan=2, sticky="ew")
-        ttk.Label(settings, style="Hint.TLabel",
-                  text="対応：SDCの番号列・奇数／偶数列形式。選択方向の指定SDC列を各項目に使用します。\n"
-                       "周面は既存画面方式（押込みK1を正負の全勾配、Fyを正負の両制限値に設定）。",
-                  justify="left", wraplength=570).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        # ttk.Label(settings, style="Hint.TLabel",
+        #           text="対応：SDCの番号列・奇数／偶数列形式。選択方向の指定SDC列を各項目に使用します。\n"
+        #                "周面は既存画面方式（押込みK1を正負の全勾配、Fyを正負の両制限値に設定）。",
+        #           justify="left", wraplength=570).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
         destination = ttk.LabelFrame(form, text="4  保存先", padding=12)
         destination.pack(fill="x")
         destination.columnconfigure(0, weight=1)
         self.output_entry = self.control(ttk.Entry(destination, textvariable=self.paths["output"]))
         self.output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self.output_button = self.control(ttk.Button(destination, text="保存先…", command=self.select_output))
-        self.output_button.grid(row=0, column=1)
+        self.output_button.grid(row=0, column=1, sticky="e")
         choices = ttk.Frame(destination)
-        choices.grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        choices.grid(row=1, column=0, sticky="w", pady=(8, 0))
         self.control(ttk.Checkbutton(choices, text="元ファイルを更新（日時付きバックアップを作成）",
                                     variable=self.overwrite, command=self.output_changed)).pack(anchor="w")
+        self.open_button = ttk.Button(
+            destination, text="保存先フォルダーを開く", command=self.open_result, state="disabled")
+        self.open_button.grid(row=1, column=1, sticky="e", pady=(8, 0))
         self.control(ttk.Checkbutton(choices, text="完了後、関連付けアプリで開く",
                                     variable=self.auto_open))#.pack(anchor="w") # 「非表示だが、自動で開く機能は維持」するなら、末尾の .pack(anchor="w") だけ外します。
-        self.control(ttk.Checkbutton(choices, text="計算過程をExcelに保存", variable=self.excel_output)).pack(anchor="w")
-        ttk.Label(destination, text="Excelはモデルと同じフォルダーに、モデル名.実行ID.計算過程.xlsx として保存します。",
-                  style="Hint.TLabel", wraplength=600).grid(row=2,column=0,columnspan=2,sticky="w",pady=(8,0))
+        self.control(ttk.Checkbutton(choices, text="計算過程をExcelに保存", variable=self.excel_output))#.pack(anchor="w")
+        # ttk.Label(destination, text="Excelはモデルと同じフォルダーに、モデル名.実行ID.計算過程.xlsx として保存します。",
+        #           style="Hint.TLabel", wraplength=600).grid(row=2,column=0,columnspan=2,sticky="w",pady=(8,0))
         self.excel_preview = ExcelPreview(self.notebook)
         self.notebook.add(self.excel_preview,text="計算過程Excel")
         actions = ttk.Frame(container)
@@ -167,8 +170,6 @@ class App:
         self.control(ttk.Button(actions, text="Excelをプレビュー", command=lambda: self.run(False))).pack(side="left")
         self.save_button = self.control(ttk.Button(actions, text="変換して保存", command=lambda: self.run(True)))
         self.save_button.pack(side="left", padx=8)
-        self.open_button = ttk.Button(actions, text="保存したファイルを開く", command=self.open_result, state="disabled")
-        self.open_button.pack(side="left", padx=8)
         self.open_excel_button = ttk.Button(actions,text="計算過程Excelを開く",command=self.open_excel,state="disabled")
         self.open_excel_button.pack(side="left",padx=8)
         self.progress = ttk.Progressbar(actions, mode="indeterminate", length=120)
@@ -311,10 +312,10 @@ class App:
     def open_result(self):
         if self.last_saved:
             try:
-                os.startfile(self.last_saved.output)
+                os.startfile(self.last_saved.output.parent)
             except OSError as exc:
                 messagebox.showwarning("変換・保存は完了しました",
-                                       f"関連付けアプリで開けませんでした。\n{self.last_saved.output}\n\n{exc}", parent=self.root)
+                                       f"保存先フォルダーを開けませんでした。\n{self.last_saved.output}\n\n{exc}", parent=self.root)
 
     def show_error(self, exc, trace):
         if isinstance(exc, (converter.InputError, OSError, UnicodeError, DecimalException)):

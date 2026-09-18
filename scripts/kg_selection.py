@@ -60,8 +60,8 @@ class KGSelection(ttk.Frame):
             button.pack(side="left", padx=(8, 0))
             self.direction_buttons[direction] = button
         self.assignment_help = tk.StringVar(value="選択方向のSDC列を読み込むと一括設定の割当を表示します。")
-        ttk.Label(self, textvariable=self.assignment_help,
-                  wraplength=565, justify="left").pack(fill="x", pady=(4, 0))
+        # ttk.Label(self, textvariable=self.assignment_help,
+        #           wraplength=565, justify="left").pack(fill="x", pady=(4, 0))
         self.traces = [(path, path.trace_add("write", self.path_changed))
                        for path in (ndu_path, sdc_path, self.sdc_direction)]
         self.poll_id = self.after(75, self.poll)
